@@ -105,11 +105,13 @@ func pemHeaderToType(header string) model.CertType {
 
 // detectBinary attempts to detect the type of binary (DER) encoded data.
 func detectBinary(data []byte) model.CertType {
+	// PKCS#12 check must come before the generic X.509 SEQUENCE check because
+	// both formats start with the 0x30 ASN.1 SEQUENCE tag.
+	if isBinaryPKCS12(data) {
+		return model.TypePKCS7 // PKCS#12 is dispatched via the TypePKCS7 branch
+	}
 	if isBinaryX509(data) {
 		return model.TypeX509
-	}
-	if isBinaryPKCS12(data) {
-		return model.TypePKCS7 // PKCS#12 detected differently in dispatcher
 	}
 	return model.TypeUnknown
 }

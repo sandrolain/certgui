@@ -18,24 +18,30 @@ type Config struct {
 
 // Server wraps an http.Server with certgui-specific configuration.
 type Server struct {
-	cfg    Config
+	cfg     Config
 	httpSrv *http.Server
+	handler http.Handler
 }
 
 // New creates a new Server with the given configuration.
 func New(cfg Config) *Server {
-	return &Server{cfg: cfg}
+	s := &Server{cfg: cfg}
+	s.handler = s.buildMux()
+	return s
+}
+
+// ServeHTTP implements http.Handler so Server can be used directly in tests.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.handler.ServeHTTP(w, r)
 }
 
 // Start begins listening and serving HTTP requests.
 // It blocks until the server encounters an error or is shut down.
 func (s *Server) Start() error {
-	mux := s.buildMux()
-
 	addr := fmt.Sprintf("%s:%d", s.cfg.Bind, s.cfg.Port)
 	s.httpSrv = &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           s.handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
