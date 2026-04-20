@@ -75,7 +75,7 @@ func TestParseX509PEM_RSA(t *testing.T) {
 	if cert.Subject.CommonName != "test-rsa" {
 		t.Errorf("CN = %q, want %q", cert.Subject.CommonName, "test-rsa")
 	}
-	if !cert.SelfSigned {
+	if !cert.IsSelfSigned {
 		t.Error("expected self-signed")
 	}
 	if cert.PublicKey.Algorithm != "RSA" {
@@ -133,8 +133,11 @@ func TestParseCSR(t *testing.T) {
 	if info.Subject.CommonName != "test-csr" {
 		t.Errorf("CN = %q, want %q", info.Subject.CommonName, "test-csr")
 	}
-	if !info.SignatureValid {
-		t.Error("expected signature_valid = true")
+	// A valid CSR must have no INVALID_CSR_SIGNATURE issue.
+	for _, issue := range info.Issues {
+		if issue.Code == "INVALID_CSR_SIGNATURE" {
+			t.Errorf("unexpected CSR signature issue: %s", issue.Message)
+		}
 	}
 }
 
@@ -149,8 +152,9 @@ func TestParsePrivateKey_RSA(t *testing.T) {
 	if info.Algorithm != "RSA" {
 		t.Errorf("algorithm = %q, want RSA", info.Algorithm)
 	}
-	if info.Encrypted {
-		t.Error("expected not encrypted")
+	// An unencrypted key must not report Algorithm == "Encrypted".
+	if info.Algorithm == "Encrypted" {
+		t.Error("expected unencrypted key")
 	}
 }
 
