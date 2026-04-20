@@ -1,0 +1,104 @@
+version: '3'
+
+vars:
+  VERSION: '{{.VERSION | default "dev"}}'
+  LDFLAGS: '-X github.com/sandrolain/certgui/cmd/certgui/cli.version={{.VERSION}}'
+  BINARY: certgui
+
+tasks:
+
+  # ── Frontend ────────────────────────────────────────────────────────────────
+
+  build:frontend:
+    desc: Compile the frontend with Bun / Vite (output → dist/)
+    dir: web
+    cmds:
+      - bun install --frozen-lockfile
+      - bun run build
+
+  # ── Go binary ───────────────────────────────────────────────────────────────
+
+  build:go:
+    desc: Compile the Go binary with embedded frontend assets
+    deps: [build:frontend]
+    cmds:
+      - go build -ldflags "{{.LDFLAGS}}" -o {{.BINARY}} ./cmd/certgui
+
+  build:
+    desc: Full build — frontend + Go binary
+    cmds:
+      - task: build:go
+
+  # ── Development ─────────────────────────────────────────────────────────────
+
+  dev:
+    desc: Start the Go server and the Vite dev server in parallel
+    deps: []
+    cmds:
+      - task --parallel dev:go dev:frontend
+
+  dev:go:
+    desc: Run the Go server in dev mode (no browser, hot-reload via Air optional)
+    cmds:
+      - go run ./cmd/certgui --no-open --port 3000
+
+  dev:frontend:
+    desc: Start the Vite dev server with HMR
+    dir: web
+    cmds:
+      - bun run dev
+
+  # ── Tests ───────────────────────────────────────────────────────────────────
+
+  test:go:
+    desc: Run Go tests with race detector and coverage report
+    cmds:
+      - go test -race -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
+  test:frontend:
+    desc: Run Vitest unit tests
+    dir: web
+    cmds:
+      - bun run test
+
+  test:
+    desc: Run all tests (Go + frontend)
+    cmds:
+      - task: test:go
+      - task: test:frontend
+
+  # ── Lint ────────────────────────────────────────────────────────────────────
+
+  lint:
+    desc: Lint Go and frontend code
+    cmds:
+      - go vet ./...
+      - cmd: staticcheck ./...
+        ignore_error: true
+      - cd web && bun run lint
+
+  # ── Release ─────────────────────────────────────────────────────────────────
+
+  release:
+    desc: Cross-compile for all supported platforms (output → dist/)
+    deps: [build:frontend]
+    cmds:
+      - mkdir -p release
+      - GOOS=darwin  GOARCH=arm64  go build -ldflags "{{.LDFLAGS}}" -o release/{{.BINARY}}-darwin-arm64   ./cmd/certgui
+      - GOOS=darwin  GOARCH=amd64  go build -ldflags "{{.LDFLAGS}}" -o release/{{.BINARY}}-darwin-amd64   ./cmd/certgui
+      - GOOS=linux   GOARCH=amd64  go build -ldflags "{{.LDFLAGS}}" -o release/{{.BINARY}}-linux-amd64    ./cmd/certgui
+      - GOOS=linux   GOARCH=arm64  go build -ldflags "{{.LDFLAGS}}" -o release/{{.BINARY}}-linux-arm64    ./cmd/certgui
+      - GOOS=windows GOARCH=amd64  go build -ldflags "{{.LDFLAGS}}" -o release/{{.BINARY}}-windows-amd64.exe ./cmd/certgui
+
+  # ── Utilities ───────────────────────────────────────────────────────────────
+
+  clean:
+    desc: Remove all build artefacts
+    cmds:
+      - rm -rf dist/ web/dist/ release/ {{.BINARY}} coverage.out coverage.html
+
+  testdata:
+    desc: Generate certificate fixtures for Go tests (requires openssl)
+    cmds:
+      - bash testdata/generate.sh
