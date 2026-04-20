@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { AnalyzeResponse } from "../api.js";
 
@@ -11,11 +11,9 @@ import type { AnalyzeResponse } from "../api.js";
  */
 @customElement("cg-export-menu")
 export class CgExportMenu extends LitElement {
-  static override styles = css`
-    :host {
-      display: inline-block;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @property({ type: Object }) response: AnalyzeResponse | undefined = undefined;
   @property({ type: String }) filename = "export";
@@ -24,12 +22,26 @@ export class CgExportMenu extends LitElement {
     return html`
       <div class="dropdown dropdown-end">
         <label tabindex="0" class="btn btn-sm btn-outline gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
           </svg>
           Export
         </label>
-        <ul tabindex="0" class="dropdown-content z-10 menu p-2 shadow bg-base-100 rounded-box w-40 border border-base-300">
+        <ul
+          tabindex="0"
+          class="dropdown-content z-10 menu p-2 shadow bg-base-100 rounded-box w-40 border border-base-300"
+        >
           <li><a @click=${() => this._download("json")}>JSON</a></li>
           <li><a @click=${() => this._download("yaml")}>YAML</a></li>
         </ul>
@@ -70,7 +82,9 @@ export class CgExportMenu extends LitElement {
     if (Array.isArray(obj)) {
       if (obj.length === 0) return "[]";
       return obj
-        .map((item) => `\n${pad}- ${this._toYAML(item, indent + 1).trimStart()}`)
+        .map(
+          (item) => `\n${pad}- ${this._toYAML(item, indent + 1).trimStart()}`,
+        )
         .join("");
     }
     if (typeof obj === "object") {
@@ -79,7 +93,8 @@ export class CgExportMenu extends LitElement {
       return entries
         .map(([k, v]) => {
           const val = this._toYAML(v, indent + 1);
-          const isComplex = typeof v === "object" && v !== null && !Array.isArray(v);
+          const isComplex =
+            typeof v === "object" && v !== null && !Array.isArray(v);
           return `\n${pad}${k}:${isComplex ? val : " " + val}`;
         })
         .join("");

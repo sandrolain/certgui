@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { X509Info } from "../api.js";
 
@@ -8,22 +8,9 @@ import type { X509Info } from "../api.js";
  */
 @customElement("cg-chain-graph")
 export class CgChainGraph extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-    }
-    .chain-node {
-      position: relative;
-    }
-    .chain-node:not(:last-child)::after {
-      content: "";
-      display: block;
-      width: 2px;
-      height: 1.5rem;
-      background: oklch(var(--bc) / 0.2);
-      margin-left: 1.25rem;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @property({ type: Array }) certs: X509Info[] = [];
 
@@ -48,14 +35,24 @@ export class CgChainGraph extends LitElement {
 
     return html`
       <div class="chain-node">
-        <div class="flex items-center gap-3 p-3 rounded-lg bg-base-100 border border-base-300">
+        <div
+          class="flex items-center gap-3 p-3 rounded-lg bg-base-100 border border-base-300"
+        >
           <span class="text-xl">${icon}</span>
           <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm truncate">${cert.subject.common_name ?? "—"}</div>
+            <div class="font-medium text-sm truncate">
+              ${cert.subject.common_name ?? "—"}
+            </div>
             <div class="text-xs text-base-content/50">${role}</div>
           </div>
-          ${expired ? html`<span class="badge badge-error badge-xs">expired</span>` : ""}
-          ${cert.self_signed ? html`<span class="badge badge-neutral badge-xs">self-signed</span>` : ""}
+          ${expired
+            ? html`<span class="badge badge-error badge-xs">expired</span>`
+            : ""}
+          ${cert.self_signed
+            ? html`<span class="badge badge-neutral badge-xs"
+                >self-signed</span
+              >`
+            : ""}
         </div>
       </div>
     `;

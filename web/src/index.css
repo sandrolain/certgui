@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
-
 body {
   margin: 0;
   display: flex;
@@ -14,4 +13,61 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+/* ── Custom element display (Light DOM — no Shadow DOM isolation) ─────────── */
+cg-app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+cg-header,
+cg-file-list,
+cg-detail-panel,
+cg-cert-detail,
+cg-password-dialog,
+cg-diff-view,
+cg-chain-graph,
+cg-raw-decoder {
+  display: block;
+}
+
+cg-issue-badge,
+cg-copy-button,
+cg-export-menu {
+  display: inline-block;
+}
+
+/* ── cg-diff-view ───────────────────────────────────────────────────────── */
+.diff-added {
+  background-color: oklch(var(--su) / 0.15);
+}
+.diff-removed {
+  background-color: oklch(var(--er) / 0.15);
+}
+.diff-same {
+  opacity: 0.6;
+}
+
+/* ── cg-chain-graph ─────────────────────────────────────────────────────── */
+.chain-node {
+  position: relative;
+}
+.chain-node:not(:last-child)::after {
+  content: "";
+  display: block;
+  width: 2px;
+  height: 1.5rem;
+  background: oklch(var(--bc) / 0.2);
+  margin-left: 1.25rem;
+}
+
+/* ── cg-raw-decoder ─────────────────────────────────────────────────────── */
+pre.raw-content {
+  font-family:
+    ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
 }

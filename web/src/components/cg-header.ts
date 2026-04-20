@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
 /**
@@ -7,11 +7,9 @@ import { customElement } from "lit/decorators.js";
  */
 @customElement("cg-header")
 export class CgHeader extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   override render() {
     return html`
@@ -66,7 +64,11 @@ export class CgHeader extends LitElement {
 
   private _emit(files: FileList) {
     this.dispatchEvent(
-      new CustomEvent("files-dropped", { detail: files, bubbles: true, composed: true })
+      new CustomEvent("files-dropped", {
+        detail: files,
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 }

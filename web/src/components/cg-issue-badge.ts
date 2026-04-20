@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Severity } from "../api.js";
 
@@ -7,11 +7,9 @@ import type { Severity } from "../api.js";
  */
 @customElement("cg-issue-badge")
 export class CgIssueBadge extends LitElement {
-  static override styles = css`
-    :host {
-      display: inline-block;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @property({ type: String }) severity: Severity = "info";
   @property({ type: Number }) count = 0;
@@ -21,8 +19,8 @@ export class CgIssueBadge extends LitElement {
       this.severity === "error"
         ? "badge-error"
         : this.severity === "warning"
-        ? "badge-warning"
-        : "badge-info";
+          ? "badge-warning"
+          : "badge-info";
 
     return html`<span class="badge ${cls} badge-xs">${this.count}</span>`;
   }
@@ -34,7 +32,6 @@ declare global {
   }
 }
 
-
 // ── cg-copy-button ────────────────────────────────────────────────────────────
 
 /**
@@ -42,22 +39,18 @@ declare global {
  */
 @customElement("cg-copy-button")
 export class CgCopyButton extends LitElement {
-  static override styles = css`
-    :host {
-      display: inline-block;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @property({ type: String }) text = "";
   @state() private _copied = false;
 
   override render() {
     return html`
-      <button
-        class="btn btn-ghost btn-xs"
-        title="Copy"
-        @click=${this._copy}
-      >${this._copied ? "✓" : "⎘"}</button>
+      <button class="btn btn-ghost btn-xs" title="Copy" @click=${this._copy}>
+        ${this._copied ? "✓" : "⎘"}
+      </button>
     `;
   }
 
@@ -65,7 +58,9 @@ export class CgCopyButton extends LitElement {
     if (!this.text) return;
     await navigator.clipboard.writeText(this.text);
     this._copied = true;
-    setTimeout(() => { this._copied = false; }, 1500);
+    setTimeout(() => {
+      this._copied = false;
+    }, 1500);
   }
 }
 

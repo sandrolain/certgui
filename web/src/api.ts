@@ -156,7 +156,7 @@ export interface AnalyzeRequest {
 
 export async function analyzeFile(
   file: File,
-  password?: string
+  password?: string,
 ): Promise<AnalyzeResponse> {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);

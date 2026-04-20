@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 /**
@@ -7,11 +7,9 @@ import { customElement, state } from "lit/decorators.js";
  */
 @customElement("cg-password-dialog")
 export class CgPasswordDialog extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @state() private _value = "";
 
@@ -28,13 +26,17 @@ export class CgPasswordDialog extends LitElement {
             class="input input-bordered w-full"
             placeholder="Password"
             .value=${this._value}
-            @input=${(e: InputEvent) => { this._value = (e.target as HTMLInputElement).value; }}
+            @input=${(e: InputEvent) => {
+              this._value = (e.target as HTMLInputElement).value;
+            }}
             @keydown=${this._onKeyDown}
             autofocus
           />
           <div class="modal-action">
             <button class="btn btn-ghost" @click=${this._cancel}>Cancel</button>
-            <button class="btn btn-primary" @click=${this._submit}>Unlock</button>
+            <button class="btn btn-primary" @click=${this._submit}>
+              Unlock
+            </button>
           </div>
         </div>
         <div class="modal-backdrop bg-base-300/50" @click=${this._cancel}></div>
@@ -48,12 +50,20 @@ export class CgPasswordDialog extends LitElement {
   }
 
   private _submit() {
-    this.dispatchEvent(new CustomEvent("password-submit", { detail: this._value, bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent("password-submit", {
+        detail: this._value,
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this._value = "";
   }
 
   private _cancel() {
-    this.dispatchEvent(new CustomEvent("password-cancel", { bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent("password-cancel", { bubbles: true, composed: true }),
+    );
     this._value = "";
   }
 }

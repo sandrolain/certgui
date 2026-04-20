@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { AnalyzeResponse } from "./api.js";
 import { analyzeFile } from "./api.js";
@@ -19,14 +19,9 @@ export interface FileEntry {
 
 @customElement("cg-app")
 export class CgApp extends LitElement {
-  // Use global Tailwind/DaisyUI styles, not shadow-DOM scoped styles.
-  static override styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100dvh;
-    }
-  `;
+  override createRenderRoot() {
+    return this;
+  }
 
   @state() private files: FileEntry[] = [];
   @state() private selectedId: string | null = null;
@@ -38,9 +33,7 @@ export class CgApp extends LitElement {
 
   override render() {
     return html`
-      <cg-header
-        @files-dropped=${this._onFilesDropped}
-      ></cg-header>
+      <cg-header @files-dropped=${this._onFilesDropped}></cg-header>
 
       <div class="flex flex-1 overflow-hidden">
         <cg-file-list
@@ -126,7 +119,10 @@ export class CgApp extends LitElement {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // Heuristic: ask for password if the error suggests decryption failure.
-      if (msg.toLowerCase().includes("decryption") || msg.toLowerCase().includes("password")) {
+      if (
+        msg.toLowerCase().includes("decryption") ||
+        msg.toLowerCase().includes("password")
+      ) {
         this.passwordPromptId = id;
         this._updateEntry(id, { status: "pending" });
       } else {
@@ -136,9 +132,7 @@ export class CgApp extends LitElement {
   }
 
   private _updateEntry(id: string, patch: Partial<FileEntry>) {
-    this.files = this.files.map((f) =>
-      f.id === id ? { ...f, ...patch } : f
-    );
+    this.files = this.files.map((f) => (f.id === id ? { ...f, ...patch } : f));
   }
 }
 

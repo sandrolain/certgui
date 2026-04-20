@@ -16,3 +16,7 @@ bin/
 # Other
 /spec
 /temp
+
+# build
+/internal/server/dist
+/certgui
