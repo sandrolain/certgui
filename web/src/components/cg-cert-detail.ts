@@ -1,8 +1,11 @@
 import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { AnalyzeResponse, X509Info, CSRInfo, CRLInfo, PKCS7Info, PrivateKeyInfo, JWKInfo, Issue } from "../api.js";
 import "./cg-issue-badge.js";
 import "./cg-copy-button.js";
+import "./cg-export-menu.js";
+import "./cg-chain-graph.js";
+import "./cg-raw-decoder.js";
 
 /**
  * Full detail view for an analysed certificate / key file.
@@ -18,6 +21,8 @@ export class CgCertDetail extends LitElement {
 
   @property({ type: Object }) response: AnalyzeResponse | undefined = undefined;
   @property({ type: String }) filename = "";
+  @property({ type: Object }) file: File | undefined = undefined;
+  @state() private _tab: "detail" | "raw" = "detail";
 
   override render() {
     if (!this.response) return html``;
@@ -28,11 +33,22 @@ export class CgCertDetail extends LitElement {
         <div class="flex items-center gap-3 flex-wrap">
           <h2 class="text-lg font-semibold truncate">${this.filename}</h2>
           <span class="badge badge-outline">${type}</span>
+          <div class="ml-auto flex gap-2">
+            <cg-export-menu .response=${this.response} .filename=${this.filename.replace(/\.[^.]+$/, "")}></cg-export-menu>
+          </div>
         </div>
 
-        ${issues.length > 0 ? this._renderIssues("Top-level issues", issues) : ""}
+        <div class="tabs tabs-border">
+          <button class="tab ${this._tab === "detail" ? "tab-active" : ""}" @click=${() => { this._tab = "detail"; }}>Detail</button>
+          <button class="tab ${this._tab === "raw" ? "tab-active" : ""}" @click=${() => { this._tab = "raw"; }}>Raw</button>
+        </div>
 
-        ${entries.map((entry, i) => this._renderEntry(type, entry, i, entries.length))}
+        ${this._tab === "raw"
+          ? html`<cg-raw-decoder .file=${this.file}></cg-raw-decoder>`
+          : html`
+            ${issues.length > 0 ? this._renderIssues("Top-level issues", issues) : ""}
+            ${entries.map((entry, i) => this._renderEntry(type, entry, i, entries.length))}
+          `}
       </div>
     `;
   }
@@ -198,6 +214,18 @@ export class CgCertDetail extends LitElement {
         <div class="card-body p-4 space-y-3">
           ${label ? html`<p class="text-xs text-base-content/50 uppercase tracking-wider">${label}</p>` : ""}
           <span class="badge badge-outline badge-sm">${info.type}</span>
+
+          ${info.certificates.length > 1
+            ? html`
+                <details>
+                  <summary class="cursor-pointer text-sm font-medium">Chain of trust (${info.certificates.length} certs)</summary>
+                  <div class="mt-2 pl-2">
+                    <cg-chain-graph .certs=${info.certificates}></cg-chain-graph>
+                  </div>
+                </details>
+              `
+            : ""}
+
           ${info.certificates.map((cert, i) => this._renderX509(cert, `Certificate ${i + 1}`))}
           ${info.issues.length > 0 ? this._renderIssues("Issues", info.issues) : ""}
         </div>

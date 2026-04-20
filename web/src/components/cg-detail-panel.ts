@@ -51,7 +51,7 @@ export class CgDetailPanel extends LitElement {
 
     return html`
       <div class="p-4">
-        <cg-cert-detail .response=${result} .filename=${this.entry.file.name}></cg-cert-detail>
+        <cg-cert-detail .response=${result} .filename=${this.entry.file.name} .file=${this.entry.file}></cg-cert-detail>
       </div>
     `;
   }

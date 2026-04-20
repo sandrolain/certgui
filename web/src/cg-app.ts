@@ -6,6 +6,7 @@ import "./components/cg-header.js";
 import "./components/cg-file-list.js";
 import "./components/cg-detail-panel.js";
 import "./components/cg-password-dialog.js";
+import "./components/cg-diff-view.js";
 
 export interface FileEntry {
   id: string;
