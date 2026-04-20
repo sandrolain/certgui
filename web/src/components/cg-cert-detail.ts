@@ -261,7 +261,7 @@ ${JSON.stringify(entry, null, 2)}</pre
                 `,
               )
             : ""}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>
@@ -321,7 +321,7 @@ ${JSON.stringify(entry, null, 2)}</pre
                 `,
               )
             : ""}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>
@@ -366,7 +366,7 @@ ${JSON.stringify(entry, null, 2)}</pre
               ${info.revokedCount} certificate(s)</span
             >`,
           )}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>
@@ -404,7 +404,7 @@ ${JSON.stringify(entry, null, 2)}</pre
           ${info.certificates.map((cert, i) =>
             this._renderX509(cert, `Certificate ${i + 1}`),
           )}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>
@@ -447,7 +447,7 @@ ${JSON.stringify(entry, null, 2)}</pre
               </span>
             `,
           )}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>
@@ -496,7 +496,7 @@ ${JSON.stringify(entry, null, 2)}</pre
                 html`<span class="text-sm">${info.curve}</span>`,
               )
             : ""}
-          ${info.issues.length > 0
+          ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
         </div>

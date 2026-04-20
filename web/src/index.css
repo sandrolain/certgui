@@ -20,6 +20,7 @@ cg-app {
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  width: 100%;
 }
 
 cg-header,
