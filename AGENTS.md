@@ -51,7 +51,7 @@ certgui/
 
 ## Commit Convention
 
-Use **Conventional Commits** (https://www.conventionalcommits.org):
+Use **Conventional Commits** (<https://www.conventionalcommits.org>):
 
 ```
 <type>(<scope>): <short description>
@@ -65,6 +65,7 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`
 Scopes: `cli`, `model`, `analyzer`, `server`, `web`, `deps`, `config`
 
 Examples:
+
 ```
 feat(analyzer): add PKCS#12 parser with password support
 fix(server): return 400 when base64 content is malformed
