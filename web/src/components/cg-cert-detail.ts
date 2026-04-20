@@ -113,7 +113,7 @@ ${JSON.stringify(entry, null, 2)}</pre
   // ── X.509 ─────────────────────────────────────────────────────────────────
 
   private _renderX509(info: X509Info, label?: string) {
-    const expiry = new Date(info.not_after);
+    const expiry = new Date(info.notAfter);
     const now = new Date();
     const expired = expiry < now;
     const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000);
@@ -128,10 +128,10 @@ ${JSON.stringify(entry, null, 2)}</pre
                 ${label}
               </p>`
             : ""}
-          ${info.self_signed
+          ${info.isSelfSigned
             ? html`<div class="badge badge-neutral badge-sm">Self-signed</div>`
             : ""}
-          ${info.is_ca
+          ${info.basicConstraints?.isCA
             ? html`<div class="badge badge-secondary badge-sm ml-1">CA</div>`
             : ""}
           ${this._section("Subject", this._renderName(info.subject))}
@@ -141,7 +141,7 @@ ${JSON.stringify(entry, null, 2)}</pre
             html`
               <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span class="text-base-content/50">Not before</span>
-                <span>${new Date(info.not_before).toLocaleString()}</span>
+                <span>${new Date(info.notBefore).toLocaleString()}</span>
                 <span class="text-base-content/50">Not after</span>
                 <span
                   class="${expired
@@ -150,7 +150,7 @@ ${JSON.stringify(entry, null, 2)}</pre
                       ? "text-warning font-semibold"
                       : ""}"
                 >
-                  ${new Date(info.not_after).toLocaleString()}
+                  ${new Date(info.notAfter).toLocaleString()}
                   ${expired ? "(expired)" : `(${daysLeft}d left)`}
                 </span>
               </div>
@@ -160,11 +160,11 @@ ${JSON.stringify(entry, null, 2)}</pre
             "Public key",
             html`
               <span class="text-sm"
-                >${info.public_key.algorithm}
-                ${info.public_key.key_size
-                  ? ` — ${info.public_key.key_size} bits`
+                >${info.publicKey.algorithm}
+                ${info.publicKey.bitSize
+                  ? ` — ${info.publicKey.bitSize} bits`
                   : ""}
-                ${info.public_key.curve ? ` (${info.public_key.curve})` : ""}
+                ${info.publicKey.curve ? ` (${info.publicKey.curve})` : ""}
               </span>
             `,
           )}
@@ -174,9 +174,9 @@ ${JSON.stringify(entry, null, 2)}</pre
                 html`
                   <div class="flex flex-wrap gap-1">
                     ${[
-                      ...(info.sans.dns_names ?? []),
-                      ...(info.sans.ip_addresses ?? []),
-                      ...(info.sans.email_addresses ?? []),
+                      ...(info.sans.dnsNames ?? []),
+                      ...(info.sans.ipAddresses ?? []),
+                      ...(info.sans.emailAddresses ?? []),
                     ].map(
                       (s) =>
                         html`<span class="badge badge-ghost badge-sm font-mono"
@@ -210,12 +210,12 @@ ${JSON.stringify(entry, null, 2)}</pre
               </div>
             `,
           )}
-          ${info.key_usage?.length
+          ${info.keyUsage?.length
             ? this._section(
                 "Key usage",
                 html`
                   <div class="flex flex-wrap gap-1">
-                    ${info.key_usage.map(
+                    ${info.keyUsage.map(
                       (u) =>
                         html`<span class="badge badge-outline badge-sm"
                           >${u}</span
@@ -225,12 +225,12 @@ ${JSON.stringify(entry, null, 2)}</pre
                 `,
               )
             : ""}
-          ${info.extended_key_usage?.length
+          ${info.extKeyUsage?.length
             ? this._section(
                 "Extended key usage",
                 html`
                   <div class="flex flex-wrap gap-1">
-                    ${info.extended_key_usage.map(
+                    ${info.extKeyUsage.map(
                       (u) =>
                         html`<span class="badge badge-outline badge-sm"
                           >${u}</span
@@ -245,13 +245,13 @@ ${JSON.stringify(entry, null, 2)}</pre
                 "Revocation",
                 html`
                   <div class="text-xs space-y-1">
-                    ${info.revocation.ocsp_servers?.map(
+                    ${info.revocation.ocspServers?.map(
                       (s) =>
                         html`<div>
                           <span class="text-base-content/50">OCSP </span>${s}
                         </div>`,
                     ) ?? ""}
-                    ${info.revocation.crl_distribution_points?.map(
+                    ${info.revocation.crlDistributionPoints?.map(
                       (s) =>
                         html`<div>
                           <span class="text-base-content/50">CRL DP </span>${s}
@@ -283,18 +283,23 @@ ${JSON.stringify(entry, null, 2)}</pre
               </p>`
             : ""}
           <div
-            class="badge ${info.signature_valid
+            class="badge ${!info.issues.some(
+              (i) => i.code === "INVALID_CSR_SIGNATURE",
+            )
               ? "badge-success"
               : "badge-error"} badge-sm"
           >
-            Signature ${info.signature_valid ? "valid" : "invalid"}
+            Signature
+            ${!info.issues.some((i) => i.code === "INVALID_CSR_SIGNATURE")
+              ? "valid"
+              : "invalid"}
           </div>
           ${this._section("Subject", this._renderName(info.subject))}
           ${this._section(
             "Public key",
             html`<span class="text-sm"
-              >${info.public_key.algorithm}${info.public_key.key_size
-                ? ` — ${info.public_key.key_size} bits`
+              >${info.publicKey.algorithm}${info.publicKey.bitSize
+                ? ` — ${info.publicKey.bitSize} bits`
                 : ""}</span
             >`,
           )}
@@ -304,8 +309,8 @@ ${JSON.stringify(entry, null, 2)}</pre
                 html`
                   <div class="flex flex-wrap gap-1">
                     ${[
-                      ...(info.sans.dns_names ?? []),
-                      ...(info.sans.ip_addresses ?? []),
+                      ...(info.sans.dnsNames ?? []),
+                      ...(info.sans.ipAddresses ?? []),
                     ].map(
                       (s) =>
                         html`<span class="badge badge-ghost badge-sm font-mono"
@@ -343,20 +348,22 @@ ${JSON.stringify(entry, null, 2)}</pre
             html`
               <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span class="text-base-content/50">This update</span
-                ><span>${new Date(info.this_update).toLocaleString()}</span>
-                ${info.next_update
-                  ? html`<span class="text-base-content/50">Next update</span
-                      ><span
-                        >${new Date(info.next_update).toLocaleString()}</span
-                      >`
-                  : ""}
+                <span>${new Date(info.thisUpdate).toLocaleString()}</span>
+                ${
+                  info.nextUpdate
+                    ? html`<span class="text-base-content/50">Next update</span
+                        ><span
+                          >${new Date(info.nextUpdate).toLocaleString()}</span
+                        >`
+                    : ""
+                }
               </div>
             `,
           )}
           ${this._section(
             "Revoked",
             html`<span class="text-sm"
-              >${info.revoked_count} certificate(s)</span
+              ${info.revokedCount} certificate(s)</span
             >`,
           )}
           ${info.issues.length > 0
@@ -380,8 +387,6 @@ ${JSON.stringify(entry, null, 2)}</pre
                 ${label}
               </p>`
             : ""}
-          <span class="badge badge-outline badge-sm">${info.type}</span>
-
           ${info.certificates.length > 1
             ? html`
                 <details>
@@ -425,7 +430,7 @@ ${JSON.stringify(entry, null, 2)}</pre
             html`
               <span class="text-sm"
                 >${info.algorithm}
-                ${info.key_size ? ` — ${info.key_size} bits` : ""}
+                ${info.bitSize ? ` — ${info.bitSize} bits` : ""}
                 ${info.curve ? ` (${info.curve})` : ""}
               </span>
             `,
@@ -434,11 +439,11 @@ ${JSON.stringify(entry, null, 2)}</pre
             "Encrypted",
             html`
               <span
-                class="badge ${info.encrypted
+                class="badge ${info.algorithm === "Encrypted"
                   ? "badge-warning"
                   : "badge-ghost"} badge-sm"
               >
-                ${info.encrypted ? "Yes" : "No"}
+                ${info.algorithm === "Encrypted" ? "Yes" : "No"}
               </span>
             `,
           )}
@@ -465,24 +470,24 @@ ${JSON.stringify(entry, null, 2)}</pre
             : ""}
           ${this._section(
             "Key type",
-            html`<span class="text-sm font-mono">${info.key_type}</span>`,
+            html`<span class="text-sm font-mono">${info.kty}</span>`,
           )}
-          ${info.algorithm
+          ${info.alg
             ? this._section(
                 "Algorithm",
-                html`<span class="text-sm">${info.algorithm}</span>`,
+                html`<span class="text-sm">${info.alg}</span>`,
               )
             : ""}
-          ${info.key_id
+          ${info.kid
             ? this._section(
                 "Key ID",
-                html`<span class="text-sm font-mono">${info.key_id}</span>`,
+                html`<span class="text-sm font-mono">${info.kid}</span>`,
               )
             : ""}
-          ${info.key_size
+          ${info.bitSize
             ? this._section(
                 "Key size",
-                html`<span class="text-sm">${info.key_size} bits</span>`,
+                html`<span class="text-sm">${info.bitSize} bits</span>`,
               )
             : ""}
           ${info.curve
@@ -514,9 +519,9 @@ ${JSON.stringify(entry, null, 2)}</pre
 
   private _renderName(name: import("../api.js").NameInfo) {
     const parts = [
-      name.common_name,
+      name.commonName,
       name.organization?.join(", "),
-      name.organizational_unit?.join(", "),
+      name.organizationalUnit?.join(", "),
       name.country?.join(", "),
     ].filter(Boolean);
 

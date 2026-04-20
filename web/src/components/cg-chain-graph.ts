@@ -28,7 +28,7 @@ export class CgChainGraph extends LitElement {
     const isLeaf = index === 0;
     const isRoot = index === this.certs.length - 1;
     const now = new Date();
-    const expired = new Date(cert.not_after) < now;
+    const expired = new Date(cert.notAfter) < now;
 
     const icon = isRoot ? "🔑" : isLeaf ? "📄" : "🔗";
     const role = isRoot ? "Root CA" : isLeaf ? "End-entity" : "Intermediate CA";
@@ -41,14 +41,14 @@ export class CgChainGraph extends LitElement {
           <span class="text-xl">${icon}</span>
           <div class="flex-1 min-w-0">
             <div class="font-medium text-sm truncate">
-              ${cert.subject.common_name ?? "—"}
+              ${cert.subject.commonName ?? "—"}
             </div>
             <div class="text-xs text-base-content/50">${role}</div>
           </div>
           ${expired
             ? html`<span class="badge badge-error badge-xs">expired</span>`
             : ""}
-          ${cert.self_signed
+          ${cert.isSelfSigned
             ? html`<span class="badge badge-neutral badge-xs"
                 >self-signed</span
               >`

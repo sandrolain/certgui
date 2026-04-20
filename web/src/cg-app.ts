@@ -26,10 +26,53 @@ export class CgApp extends LitElement {
   @state() private files: FileEntry[] = [];
   @state() private selectedId: string | null = null;
   @state() private passwordPromptId: string | null = null;
+  @state() private _isDragging = false;
+  private _dragCounter = 0;
 
   private get selected(): FileEntry | undefined {
     return this.files.find((f) => f.id === this.selectedId);
   }
+
+  override connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener("dragenter", this._onGlobalDragEnter);
+    document.addEventListener("dragleave", this._onGlobalDragLeave);
+    document.addEventListener("dragover", this._onGlobalDragOver);
+    document.addEventListener("drop", this._onGlobalDrop);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener("dragenter", this._onGlobalDragEnter);
+    document.removeEventListener("dragleave", this._onGlobalDragLeave);
+    document.removeEventListener("dragover", this._onGlobalDragOver);
+    document.removeEventListener("drop", this._onGlobalDrop);
+  }
+
+  private _onGlobalDragEnter = (e: DragEvent) => {
+    if (e.dataTransfer?.types.includes("Files")) {
+      this._dragCounter++;
+      this._isDragging = true;
+    }
+  };
+
+  private _onGlobalDragLeave = (_e: DragEvent) => {
+    this._dragCounter = Math.max(0, this._dragCounter - 1);
+    if (this._dragCounter === 0) this._isDragging = false;
+  };
+
+  private _onGlobalDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  };
+
+  private _onGlobalDrop = (e: DragEvent) => {
+    e.preventDefault();
+    this._dragCounter = 0;
+    this._isDragging = false;
+    const files = e.dataTransfer?.files;
+    if (files?.length) this._processFiles(files);
+  };
 
   override render() {
     return html`
@@ -58,11 +101,35 @@ export class CgApp extends LitElement {
             ></cg-password-dialog>
           `
         : ""}
+      ${this._isDragging
+        ? html`
+            <div
+              class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+              style="background: oklch(var(--p) / 0.15); border: 3px dashed oklch(var(--p));"
+            >
+              <div
+                class="bg-base-100/90 rounded-2xl px-10 py-8 text-center shadow-xl"
+              >
+                <div class="text-4xl mb-3">📂</div>
+                <p class="text-lg font-bold text-primary">
+                  Drop files to analyse
+                </p>
+                <p class="text-sm text-base-content/50 mt-1">
+                  PEM, DER, PKCS#12, PKCS#7, CSR, CRL, JWK…
+                </p>
+              </div>
+            </div>
+          `
+        : ""}
     `;
   }
 
   private _onFilesDropped(e: CustomEvent<FileList>) {
-    const incoming: FileEntry[] = Array.from(e.detail).map((file) => ({
+    this._processFiles(e.detail);
+  }
+
+  private _processFiles(files: FileList) {
+    const incoming: FileEntry[] = Array.from(files).map((file) => ({
       id: crypto.randomUUID(),
       file,
       status: "pending",

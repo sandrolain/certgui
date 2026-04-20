@@ -32,8 +32,8 @@ export class CgDiffView extends LitElement {
           <thead>
             <tr>
               <th class="w-32">Field</th>
-              <th>${this.left.subject.common_name ?? "Left"}</th>
-              <th>${this.right.subject.common_name ?? "Right"}</th>
+              <th>${this.left.subject.commonName ?? "Left"}</th>
+              <th>${this.right.subject.commonName ?? "Right"}</th>
             </tr>
           </thead>
           <tbody>
@@ -61,41 +61,45 @@ export class CgDiffView extends LitElement {
     return [
       {
         label: "Subject CN",
-        l: l.subject.common_name ?? "—",
-        r: r.subject.common_name ?? "—",
+        l: l.subject.commonName ?? "—",
+        r: r.subject.commonName ?? "—",
       },
       {
         label: "Issuer CN",
-        l: l.issuer.common_name ?? "—",
-        r: r.issuer.common_name ?? "—",
+        l: l.issuer.commonName ?? "—",
+        r: r.issuer.commonName ?? "—",
       },
-      { label: "Serial", l: l.serial_number, r: r.serial_number },
+      { label: "Serial", l: l.serialNumber, r: r.serialNumber },
       {
         label: "Not before",
-        l: new Date(l.not_before).toISOString(),
-        r: new Date(r.not_before).toISOString(),
+        l: new Date(l.notBefore).toISOString(),
+        r: new Date(r.notBefore).toISOString(),
       },
       {
         label: "Not after",
-        l: new Date(l.not_after).toISOString(),
-        r: new Date(r.not_after).toISOString(),
+        l: new Date(l.notAfter).toISOString(),
+        r: new Date(r.notAfter).toISOString(),
       },
       {
         label: "Key algo",
-        l: l.public_key.algorithm,
-        r: r.public_key.algorithm,
+        l: l.publicKey.algorithm,
+        r: r.publicKey.algorithm,
       },
       {
         label: "Key size",
-        l: String(l.public_key.key_size ?? "—"),
-        r: String(r.public_key.key_size ?? "—"),
+        l: String(l.publicKey.bitSize ?? "—"),
+        r: String(r.publicKey.bitSize ?? "—"),
       },
       { label: "Sig algo", l: l.signature.algorithm, r: r.signature.algorithm },
-      { label: "Is CA", l: String(l.is_ca), r: String(r.is_ca) },
+      {
+        label: "Is CA",
+        l: String(l.basicConstraints?.isCA),
+        r: String(r.basicConstraints?.isCA),
+      },
       {
         label: "Self-signed",
-        l: String(l.self_signed),
-        r: String(r.self_signed),
+        l: String(l.isSelfSigned),
+        r: String(r.isSelfSigned),
       },
       { label: "SHA-256", l: l.fingerprints.sha256, r: r.fingerprints.sha256 },
       { label: "SHA-1", l: l.fingerprints.sha1, r: r.fingerprints.sha1 },

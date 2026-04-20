@@ -1,4 +1,4 @@
-/** API types mirroring internal/model/cert.go */
+/** API types mirroring internal/model/cert.go (camelCase JSON tags) */
 
 export type CertType =
   | "x509"
@@ -20,18 +20,18 @@ export interface Issue {
 }
 
 export interface NameInfo {
-  common_name?: string;
+  commonName?: string;
   organization?: string[];
-  organizational_unit?: string[];
+  organizationalUnit?: string[];
   country?: string[];
-  state?: string[];
+  province?: string[];
   locality?: string[];
-  serial_number?: string;
+  serialNumber?: string;
 }
 
 export interface PublicKeyInfo {
   algorithm: string;
-  key_size?: number;
+  bitSize?: number;
   curve?: string;
 }
 
@@ -42,15 +42,15 @@ export interface FingerprintInfo {
 }
 
 export interface SANInfo {
-  dns_names?: string[];
-  ip_addresses?: string[];
-  email_addresses?: string[];
+  dnsNames?: string[];
+  ipAddresses?: string[];
+  emailAddresses?: string[];
   uris?: string[];
 }
 
 export interface BasicConstraintsInfo {
-  is_ca: boolean;
-  path_len_constraint?: number;
+  isCA: boolean;
+  pathLenConstraint?: number;
 }
 
 export interface ExtensionInfo {
@@ -61,8 +61,8 @@ export interface ExtensionInfo {
 }
 
 export interface RevocationInfo {
-  ocsp_servers?: string[];
-  crl_distribution_points?: string[];
+  ocspServers?: string[];
+  crlDistributionPoints?: string[];
 }
 
 export interface SignatureInfo {
@@ -72,17 +72,18 @@ export interface SignatureInfo {
 export interface X509Info {
   subject: NameInfo;
   issuer: NameInfo;
-  serial_number: string;
-  not_before: string;
-  not_after: string;
-  is_ca: boolean;
-  self_signed: boolean;
-  public_key: PublicKeyInfo;
+  serialNumber: string;
+  notBefore: string;
+  notAfter: string;
+  daysRemaining: number;
+  isExpired: boolean;
+  isSelfSigned: boolean;
+  publicKey: PublicKeyInfo;
   fingerprints: FingerprintInfo;
-  key_usage?: string[];
-  extended_key_usage?: string[];
+  keyUsage?: string[];
+  extKeyUsage?: string[];
   sans?: SANInfo;
-  basic_constraints?: BasicConstraintsInfo;
+  basicConstraints: BasicConstraintsInfo;
   revocation?: RevocationInfo;
   extensions?: ExtensionInfo[];
   signature: SignatureInfo;
@@ -91,9 +92,8 @@ export interface X509Info {
 
 export interface CSRInfo {
   subject: NameInfo;
-  public_key: PublicKeyInfo;
+  publicKey: PublicKeyInfo;
   sans?: SANInfo;
-  signature_valid: boolean;
   signature: SignatureInfo;
   extensions?: ExtensionInfo[];
   issues: Issue[];
@@ -101,34 +101,32 @@ export interface CSRInfo {
 
 export interface CRLInfo {
   issuer: NameInfo;
-  this_update: string;
-  next_update?: string;
-  revoked_count: number;
+  thisUpdate: string;
+  nextUpdate?: string;
+  revokedCount: number;
   signature: SignatureInfo;
   issues: Issue[];
 }
 
 export interface PKCS7Info {
-  type: string;
   certificates: X509Info[];
   issues: Issue[];
 }
 
 export interface PrivateKeyInfo {
   algorithm: string;
-  key_size?: number;
+  bitSize?: number;
   curve?: string;
-  encrypted: boolean;
   issues: Issue[];
 }
 
 export interface JWKInfo {
-  key_type: string;
-  key_id?: string;
-  algorithm?: string;
+  kty: string;
+  kid?: string;
+  alg?: string;
   use?: string;
   curve?: string;
-  key_size?: number;
+  bitSize?: number;
   issues: Issue[];
 }
 
