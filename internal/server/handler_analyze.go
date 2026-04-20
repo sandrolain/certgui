@@ -50,7 +50,7 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 	case model.TypeX509:
 		infos, err := analyzer.ParseX509PEM(raw, s.cfg.WarnDays)
 		if err != nil {
-			// Try DER
+			// Fallback to DER
 			info, derr := analyzer.ParseX509DER(raw, s.cfg.WarnDays)
 			if derr != nil {
 				return nil, err
@@ -92,7 +92,9 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 		return toResponse(model.TypeCRL, []interface{}{info}, nil), nil
 
 	case model.TypePKCS7:
-		// Could be PKCS#12 binary — attempt that first when password is provided
+		// PKCS#12 binaries also look like PKCS#7 to the detector;
+		// attempt PKCS#12 decoding first when a password is supplied or the
+		// magic bytes suggest a PFX/P12 file.
 		if password != "" || isPKCS12Binary(raw) {
 			info, err := analyzer.ParsePKCS12(raw, password, s.cfg.WarnDays)
 			if err == nil {
@@ -128,7 +130,7 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 	}
 }
 
-// isPKCS12Binary performs a quick heuristic check for PKCS#12 binary files.
+// isPKCS12Binary performs a quick heuristic check for PKCS#12 binary files (DER-encoded PFX).
 func isPKCS12Binary(data []byte) bool {
 	return len(data) > 6 && data[0] == 0x30 && data[4] == 0x02
 }

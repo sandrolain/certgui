@@ -13,10 +13,9 @@ func (s *Server) buildMux() http.Handler {
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
 	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
 
-	// Static frontend assets — will be replaced with go:embed in Phase 3
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r)
-	})
+	// Serve the embedded SPA for all non-API routes.
+	// The SPA itself handles client-side routing.
+	mux.Handle("/", spaFileServer())
 
 	var handler http.Handler = mux
 	if s.cfg.Dev {
