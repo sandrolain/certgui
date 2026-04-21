@@ -3,13 +3,20 @@ package server
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/sandrolain/certgui/internal/analyzer"
 	"github.com/sandrolain/certgui/internal/model"
 )
 
 const maxBodyBytes = 10 * 1024 * 1024 // 10 MB anti-DoS limit
+
+// errPasswordRequired is returned by dispatch when a PKCS#12 file is detected
+// but no password was supplied.  The handler converts it to HTTP 422 so the
+// frontend knows to prompt the user for a passphrase.
+var errPasswordRequired = errors.New("password required for PKCS#12 file")
 
 // handleAnalyze decodes the request, delegates to the analyzer and returns results.
 func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
@@ -34,16 +41,12 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	certType := analyzer.Detect(raw)
 
-	// For PKCS#12 binary files a password is always required.
-	// When none is provided, return a dedicated error so the frontend can
-	// prompt the user for the passphrase before retrying.
-	if certType == model.TypePKCS7 && analyzer.IsBinaryPKCS12(raw) && req.Password == "" {
-		writeError(w, http.StatusUnprocessableEntity, "password required for PKCS#12 file")
-		return
-	}
-
 	resp, err := s.dispatch(certType, raw, req.Password, req.Filename)
 	if err != nil {
+		if errors.Is(err, errPasswordRequired) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, "analysis failed: "+err.Error())
 		return
 	}
@@ -53,8 +56,6 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 // dispatch routes the raw bytes to the appropriate parser based on the detected type.
 func (s *Server) dispatch(certType model.CertType, raw []byte, password, filename string) (*model.AnalyzeResponse, error) {
-	_ = filename
-
 	switch certType {
 	case model.TypeX509:
 		infos, err := analyzer.ParseX509PEM(raw, s.cfg.WarnDays)
@@ -101,15 +102,30 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 		return toResponse(model.TypeCRL, []interface{}{info}, nil), nil
 
 	case model.TypePKCS7:
-		// PKCS#12 binaries also look like PKCS#7 to the detector;
-		// attempt PKCS#12 decoding first when a password is supplied or the
-		// magic bytes suggest a PFX/P12 file.
-		if password != "" || isPKCS12Binary(raw) {
+		// A PKCS#12 file is detected either by its binary magic bytes or by
+		// its file extension (.p12 / .pfx).  In both cases we attempt to
+		// decode it as PKCS#12 first.
+		//
+		// Crucially we always TRY the parse (even with an empty password) so
+		// that password-less P12 files succeed on the first request without
+		// triggering the password dialog.  Only when the parse fails AND no
+		// password was provided do we return the sentinel error that causes
+		// the frontend to prompt for a passphrase.
+		if isPKCS12Binary(raw) || isP12Filename(filename) {
 			info, err := analyzer.ParsePKCS12(raw, password, s.cfg.WarnDays)
 			if err == nil {
 				return toResponse(model.TypePKCS7, []interface{}{info}, nil), nil
 			}
+			// Parse failed.
+			if password == "" {
+				// No password was supplied; the file is almost certainly
+				// password-protected → ask the user for a passphrase.
+				return nil, errPasswordRequired
+			}
+			// A password was provided but it was wrong (or the file is corrupt).
+			return nil, err
 		}
+		// Not a PKCS#12 file → parse as PKCS#7 PEM.
 		info, err := analyzer.ParsePKCS7(raw, s.cfg.WarnDays)
 		if err != nil {
 			return nil, err
@@ -142,6 +158,14 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 // isPKCS12Binary performs a quick heuristic check for PKCS#12 binary files (DER-encoded PFX).
 func isPKCS12Binary(data []byte) bool {
 	return len(data) > 6 && data[0] == 0x30 && data[4] == 0x02
+}
+
+// isP12Filename reports whether name has a .p12 or .pfx extension (case-insensitive).
+// This supplements isPKCS12Binary for edge cases where the magic bytes heuristic
+// does not match (e.g. very small files or alternative ASN.1 length encodings).
+func isP12Filename(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".p12") || strings.HasSuffix(lower, ".pfx")
 }
 
 // toResponse constructs an AnalyzeResponse from entries and top-level issues.

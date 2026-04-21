@@ -143,3 +143,36 @@ func TestHandleAnalyze_EmptyContent(t *testing.T) {
 		t.Errorf("status = %d, want 400", rr.Code)
 	}
 }
+
+// TestHandleAnalyze_PKCS12_NoPassword verifies that uploading a password-protected
+// PKCS#12 without supplying a password returns HTTP 422 (password required) rather
+// than a generic 400 error.
+func TestHandleAnalyze_PKCS12_NoPassword(t *testing.T) {
+	srv := newTestServer(t)
+	raw := readTestdata(t, "test.p12") // requires password "testpassword"
+	rr := analyzeRequest(t, srv, "test.p12", raw, "")
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestHandleAnalyze_PKCS12_NoPasswordFile verifies that a PKCS#12 with no password
+// at all is accepted in a single request without requiring the password dialog.
+func TestHandleAnalyze_PKCS12_NoPasswordFile(t *testing.T) {
+	srv := newTestServer(t)
+	raw := readTestdata(t, "test-nopass.p12") // no password required
+	rr := analyzeRequest(t, srv, "test-nopass.p12", raw, "")
+	if rr.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestHandleAnalyze_PKCS12_WrongPassword verifies that a wrong password returns 400.
+func TestHandleAnalyze_PKCS12_WrongPassword(t *testing.T) {
+	srv := newTestServer(t)
+	raw := readTestdata(t, "test.p12")
+	rr := analyzeRequest(t, srv, "test.p12", raw, "wrongpassword")
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400; body: %s", rr.Code, rr.Body.String())
+	}
+}
