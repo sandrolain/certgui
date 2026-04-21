@@ -42,7 +42,7 @@ export class CgFileList extends LitElement {
     }
 
     return html`
-      <ul class="menu menu-sm p-2">
+      <ul class="menu menu-sm p-2 w-full">
         ${this.files.map((f) => this._renderItem(f))}
       </ul>
     `;
@@ -58,7 +58,9 @@ export class CgFileList extends LitElement {
     return html`
       <li>
         <a
-          class="${active ? "active" : ""} flex items-center gap-2"
+          class="w-full flex items-center gap-2 ${active
+            ? "bg-base-300 text-base-content font-medium"
+            : ""}"
           @click=${() => this._select(f.id)}
         >
           ${this._statusIcon(f)}

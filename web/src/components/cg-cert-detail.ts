@@ -139,7 +139,10 @@ ${JSON.stringify(entry, null, 2)}</pre
           ${this._section(
             "Validity",
             html`
-              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <div
+                class="grid gap-x-6 gap-y-1 text-sm"
+                style="grid-template-columns: max-content 1fr"
+              >
                 <span class="text-base-content/50">Not before</span>
                 <span>${new Date(info.notBefore).toLocaleString()}</span>
                 <span class="text-base-content/50">Not after</span>
@@ -160,7 +163,7 @@ ${JSON.stringify(entry, null, 2)}</pre
             "Public key",
             html`
               <span class="text-sm"
-                >${info.publicKey.algorithm}
+                >${info.publicKey.algorithm ?? "—"}
                 ${info.publicKey.bitSize
                   ? ` — ${info.publicKey.bitSize} bits`
                   : ""}
@@ -184,6 +187,14 @@ ${JSON.stringify(entry, null, 2)}</pre
                         >`,
                     )}
                   </div>
+                  ${(info.sans.dnsNames?.length ?? 0) +
+                    (info.sans.ipAddresses?.length ?? 0) +
+                    (info.sans.emailAddresses?.length ?? 0) ===
+                  0
+                    ? html`<span class="text-base-content/30 italic text-sm"
+                        >—</span
+                      >`
+                    : ""}
                 `,
               )
             : ""}
@@ -363,7 +374,7 @@ ${JSON.stringify(entry, null, 2)}</pre
           ${this._section(
             "Revoked",
             html`<span class="text-sm"
-              ${info.revokedCount} certificate(s)</span
+              >${info.revokedCount ?? "—"} certificate(s)</span
             >`,
           )}
           ${(info.issues ?? []).length > 0
@@ -429,7 +440,7 @@ ${JSON.stringify(entry, null, 2)}</pre
             "Algorithm",
             html`
               <span class="text-sm"
-                >${info.algorithm}
+                >${info.algorithm ?? "—"}
                 ${info.bitSize ? ` — ${info.bitSize} bits` : ""}
                 ${info.curve ? ` (${info.curve})` : ""}
               </span>
@@ -512,7 +523,10 @@ ${JSON.stringify(entry, null, 2)}</pre
         <dt class="text-xs text-base-content/50 uppercase tracking-wider mb-1">
           ${title}
         </dt>
-        <dd>${content}</dd>
+        <dd>
+          ${content ??
+          html`<span class="text-base-content/30 italic text-sm">—</span>`}
+        </dd>
       </div>
     `;
   }

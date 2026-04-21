@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -13,6 +14,11 @@ import (
 )
 
 func runServe(cmd *cobra.Command, _ []string) error {
+	// Check before starting whether the preferred port is already occupied.
+	// If yes, an existing certgui instance is likely running and the browser
+	// tab is already open — it will auto-reload via the SSE reconnect.
+	preferredPortFree := isPortFree(cfg.Bind, cfg.Port)
+
 	port, err := resolvePort(cfg.Port)
 	if err != nil {
 		return err
@@ -35,7 +41,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	}()
 
 	// Open browser after the server has started.
-	if !cfg.NoOpen {
+	// Skip if the preferred port was already occupied: the page is already
+	// open and will reload automatically via the SSE connection.
+	if !cfg.NoOpen && preferredPortFree {
 		openBrowser(url)
 	}
 
@@ -53,6 +61,16 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	}
 
 	return srv.Shutdown()
+}
+
+// isPortFree returns true if nothing is listening on the given bind:port.
+func isPortFree(bind string, port int) bool {
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", bind, port))
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
 }
 
 // openBrowser opens the given URL in the system default browser.
