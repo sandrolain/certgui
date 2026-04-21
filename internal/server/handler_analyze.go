@@ -1,9 +1,11 @@
 package server
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -41,15 +43,32 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	certType := analyzer.Detect(raw)
 
+	// .srl files are OpenSSL CA serial-number trackers. Detect() cannot
+	// recognise them from content alone (plain hex text), so we use the
+	// filename as the authoritative signal.
+	if isSRLFilename(req.Filename) {
+		certType = model.TypeSRL
+	}
+
 	resp, err := s.dispatch(certType, raw, req.Password, req.Filename)
 	if err != nil {
 		if errors.Is(err, errPasswordRequired) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, analyzer.ErrKeyEncrypted) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, "analysis failed: "+err.Error())
 		return
 	}
+
+	// Persist the result in the in-memory session so it can be restored on
+	// page refresh via GET /api/v1/session/files.
+	sid := newSessionID()
+	resp.SessionID = sid
+	s.storeSession(sid, req.Filename, resp)
 
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -133,11 +152,18 @@ func (s *Server) dispatch(certType model.CertType, raw []byte, password, filenam
 		return toResponse(model.TypePKCS7, []interface{}{info}, nil), nil
 
 	case model.TypePrivateKey:
-		info, err := analyzer.ParsePrivateKey(raw)
+		info, err := analyzer.ParsePrivateKey(raw, password)
 		if err != nil {
 			return nil, err
 		}
 		return toResponse(model.TypePrivateKey, []interface{}{info}, nil), nil
+
+	case model.TypeSRL:
+		info, err := analyzer.ParseSRL(raw)
+		if err != nil {
+			return nil, err
+		}
+		return toResponse(model.TypeSRL, []interface{}{info}, nil), nil
 
 	case model.TypeJWK:
 		info, err := analyzer.ParseJWK(raw)
@@ -168,6 +194,11 @@ func isP12Filename(name string) bool {
 	return strings.HasSuffix(lower, ".p12") || strings.HasSuffix(lower, ".pfx")
 }
 
+// isSRLFilename reports whether name has the .srl extension (case-insensitive).
+func isSRLFilename(name string) bool {
+	return strings.HasSuffix(strings.ToLower(name), ".srl")
+}
+
 // toResponse constructs an AnalyzeResponse from entries and top-level issues.
 func toResponse(t model.CertType, entries []interface{}, issues []model.Issue) *model.AnalyzeResponse {
 	if issues == nil {
@@ -178,4 +209,17 @@ func toResponse(t model.CertType, entries []interface{}, issues []model.Issue) *
 		Entries: entries,
 		Issues:  issues,
 	}
+}
+
+// newSessionID generates a random UUID v4 string using crypto/rand.
+func newSessionID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Fallback: should never happen on a sane OS.
+		return "00000000-0000-0000-0000-000000000000"
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

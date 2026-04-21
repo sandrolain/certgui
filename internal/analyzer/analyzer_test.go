@@ -1,6 +1,7 @@
 package analyzer_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -145,7 +146,7 @@ func TestParseCSR(t *testing.T) {
 
 func TestParsePrivateKey_RSA(t *testing.T) {
 	data := readTestdata(t, "rsa.key.pem")
-	info, err := analyzer.ParsePrivateKey(data)
+	info, err := analyzer.ParsePrivateKey(data, "")
 	if err != nil {
 		t.Fatalf("ParsePrivateKey: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestParsePrivateKey_RSA(t *testing.T) {
 
 func TestParsePrivateKey_EC(t *testing.T) {
 	data := readTestdata(t, "ec.key.pem")
-	info, err := analyzer.ParsePrivateKey(data)
+	info, err := analyzer.ParsePrivateKey(data, "")
 	if err != nil {
 		t.Fatalf("ParsePrivateKey EC: %v", err)
 	}
@@ -279,12 +280,18 @@ func TestParseX509PEM_Fullchain(t *testing.T) {
 
 func TestParsePrivateKey_Encrypted(t *testing.T) {
 	data := readTestdata(t, "rsa.key.enc.pem")
-	info, err := analyzer.ParsePrivateKey(data)
-	if err != nil {
-		t.Fatalf("ParsePrivateKey encrypted: %v", err)
+	// Without password: expect ErrKeyEncrypted.
+	_, err := analyzer.ParsePrivateKey(data, "")
+	if !errors.Is(err, analyzer.ErrKeyEncrypted) {
+		t.Fatalf("expected ErrKeyEncrypted without password, got %v", err)
 	}
-	if info.Algorithm != "Encrypted" {
-		t.Errorf("algorithm = %q, want Encrypted", info.Algorithm)
+	// With correct password: expect RSA key info.
+	info, err := analyzer.ParsePrivateKey(data, "keypassword")
+	if err != nil {
+		t.Fatalf("ParsePrivateKey encrypted with password: %v", err)
+	}
+	if info.Algorithm != "RSA" {
+		t.Errorf("algorithm = %q, want RSA", info.Algorithm)
 	}
 }
 

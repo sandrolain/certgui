@@ -8,6 +8,7 @@ export type CertType =
   | "private_key"
   | "jwk"
   | "bundle"
+  | "srl"
   | "unknown";
 
 export type Severity = "error" | "warning" | "info";
@@ -130,15 +131,25 @@ export interface JWKInfo {
   issues: Issue[];
 }
 
+export interface SRLInfo {
+  /** Hex serial number as stored in the file (upper-cased). */
+  serialHex: string;
+  /** Same value in decimal notation. */
+  serialDecimal: string;
+  issues: Issue[];
+}
+
 export type CertEntry =
   | X509Info
   | CSRInfo
   | CRLInfo
   | PKCS7Info
   | PrivateKeyInfo
-  | JWKInfo;
+  | JWKInfo
+  | SRLInfo;
 
 export interface AnalyzeResponse {
+  sessionId?: string;
   type: CertType;
   entries: CertEntry[];
   issues: Issue[];
@@ -148,6 +159,12 @@ export interface AnalyzeRequest {
   filename?: string;
   content: string; // base64
   password?: string;
+}
+
+export interface SessionFile {
+  id: string;
+  filename: string;
+  result: AnalyzeResponse;
 }
 
 export interface VerifyChainEntry {
@@ -160,6 +177,18 @@ export interface VerifyChainResponse {
   valid: boolean;
   chain?: VerifyChainEntry[];
   error?: string;
+}
+
+export type RelationshipType = "signed-by" | "ca-for" | "revoked-by";
+
+export interface Relationship {
+  type: RelationshipType;
+  /** ID of the FileEntry that is the subject (e.g. the leaf cert) */
+  sourceId: string;
+  /** ID of the FileEntry that is the object (e.g. the CA or CRL) */
+  targetId: string;
+  /** Human-readable description */
+  label: string;
 }
 
 // ── HTTP client ──────────────────────────────────────────────────────────────
@@ -201,6 +230,20 @@ export async function analyzeFile(
   }
 
   return resp.json() as Promise<AnalyzeResponse>;
+}
+
+/** Fetch the list of analysed files stored in the server session. */
+export async function listSessionFiles(): Promise<SessionFile[]> {
+  const resp = await fetch("/api/v1/session/files");
+  if (!resp.ok) return [];
+  return resp.json() as Promise<SessionFile[]>;
+}
+
+/** Remove a file from the server session. */
+export async function deleteSessionFile(id: string): Promise<void> {
+  await fetch(`/api/v1/session/files/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 async function fileToBase64(file: File): Promise<string> {

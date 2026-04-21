@@ -1,5 +1,23 @@
 import { LitElement, html } from "lit";
-import { customElement } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+
+type ThemeMode = "system" | "light" | "dark";
+
+const STORAGE_KEY = "cg-theme";
+
+function applyTheme(mode: ThemeMode) {
+  const root = document.documentElement;
+  if (mode === "system") {
+    root.removeAttribute("data-theme");
+  } else {
+    root.setAttribute("data-theme", mode);
+  }
+}
+
+function loadTheme(): ThemeMode {
+  const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+  return stored ?? "system";
+}
 
 /**
  * Top application header with drag-and-drop zone and a file picker button.
@@ -11,7 +29,27 @@ export class CgHeader extends LitElement {
     return this;
   }
 
+  @state() private _themeMode: ThemeMode = loadTheme();
+
+  override connectedCallback() {
+    super.connectedCallback();
+    applyTheme(this._themeMode);
+  }
+
   override render() {
+    const icon =
+      this._themeMode === "dark"
+        ? "🌙"
+        : this._themeMode === "light"
+          ? "☀️"
+          : "💻";
+    const label =
+      this._themeMode === "dark"
+        ? "Dark"
+        : this._themeMode === "light"
+          ? "Light"
+          : "System";
+
     return html`
       <header
         class="navbar bg-base-200 border-b border-base-300 px-4 gap-4"
@@ -25,6 +63,14 @@ export class CgHeader extends LitElement {
           </span>
         </div>
         <div class="flex-none flex items-center gap-2">
+          <button
+            class="btn btn-ghost btn-sm gap-1"
+            title="Toggle theme (current: ${label})"
+            @click=${this._cycleTheme}
+          >
+            <span>${icon}</span>
+            <span class="hidden sm:inline text-xs">${label}</span>
+          </button>
           <span class="text-base-content/50 text-xs hidden md:block">
             Drop files here or
           </span>
@@ -41,6 +87,18 @@ export class CgHeader extends LitElement {
         </div>
       </header>
     `;
+  }
+
+  private _cycleTheme() {
+    const next: ThemeMode =
+      this._themeMode === "system"
+        ? "light"
+        : this._themeMode === "light"
+          ? "dark"
+          : "system";
+    this._themeMode = next;
+    localStorage.setItem(STORAGE_KEY, next);
+    applyTheme(next);
   }
 
   private _onDragOver(e: DragEvent) {

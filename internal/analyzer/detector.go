@@ -4,6 +4,7 @@ package analyzer
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"strings"
@@ -109,6 +110,11 @@ func detectBinary(data []byte) model.CertType {
 	// both formats start with the 0x30 ASN.1 SEQUENCE tag.
 	if isBinaryPKCS12(data) {
 		return model.TypePKCS7 // PKCS#12 is dispatched via the TypePKCS7 branch
+	}
+	// Try CRL before generic X.509: both are DER SEQUENCE but CRL will fail
+	// x509.ParseCertificate and vice-versa.
+	if _, err := x509.ParseRevocationList(data); err == nil {
+		return model.TypeCRL
 	}
 	if isBinaryX509(data) {
 		return model.TypeX509

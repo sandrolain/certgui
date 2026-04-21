@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { FileEntry } from "../cg-app.js";
 import "./cg-cert-detail.js";
 
@@ -14,6 +14,8 @@ export class CgDetailPanel extends LitElement {
 
   @property({ type: Object }) entry: FileEntry | undefined = undefined;
   @property({ type: Array }) otherFiles: File[] = [];
+  @property({ type: Array }) allFiles: FileEntry[] = [];
+  @state() private _password = "";
 
   override render() {
     if (!this.entry) {
@@ -26,7 +28,7 @@ export class CgDetailPanel extends LitElement {
       `;
     }
 
-    const { status, error, result } = this.entry;
+    const { status, error, result, needsPassword } = this.entry;
 
     if (status === "loading") {
       return html`
@@ -35,6 +37,53 @@ export class CgDetailPanel extends LitElement {
         >
           <span class="loading loading-spinner loading-md"></span>
           Analysing…
+        </div>
+      `;
+    }
+
+    if (status === "pending" && needsPassword) {
+      return html`
+        <div class="p-6 flex items-start justify-center h-full">
+          <div class="card bg-base-100 border border-base-300 w-full max-w-sm">
+            <div class="card-body gap-4">
+              <h3 class="card-title text-base">Password required</h3>
+              <p class="text-sm text-base-content/60">
+                <span class="font-medium">${this.entry.file.name}</span>
+                is password-protected. Enter the password to inspect it.
+              </p>
+              <label
+                class="input input-bordered flex items-center gap-2 w-full"
+              >
+                <input
+                  type="password"
+                  class="grow"
+                  placeholder="Password"
+                  .value=${this._password}
+                  @input=${(e: InputEvent) => {
+                    this._password = (e.target as HTMLInputElement).value;
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter") this._submitPassword();
+                  }}
+                  autofocus
+                />
+              </label>
+              <div class="flex gap-2 justify-end">
+                <button
+                  class="btn btn-ghost btn-sm"
+                  @click=${this._cancelPassword}
+                >
+                  Cancel
+                </button>
+                <button
+                  class="btn btn-primary btn-sm"
+                  @click=${this._submitPassword}
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -69,10 +118,31 @@ export class CgDetailPanel extends LitElement {
           .filename=${this.entry.file.name}
           .file=${this.entry.file}
           .otherFiles=${this.otherFiles}
+          .allFiles=${this.allFiles}
+          .entryId=${this.entry.id}
           .verifyResult=${this.entry.verifyResult ?? undefined}
         ></cg-cert-detail>
       </div>
     `;
+  }
+
+  private _submitPassword() {
+    const pw = this._password;
+    this._password = "";
+    this.dispatchEvent(
+      new CustomEvent("password-submit", {
+        detail: pw,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _cancelPassword() {
+    this._password = "";
+    this.dispatchEvent(
+      new CustomEvent("password-cancel", { bubbles: true, composed: true }),
+    );
   }
 }
 

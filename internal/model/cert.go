@@ -15,6 +15,7 @@ const (
 	TypePrivateKey CertType = "private_key"
 	TypeJWK        CertType = "jwk"
 	TypeBundle     CertType = "bundle"
+	TypeSRL        CertType = "srl"
 	TypeUnknown    CertType = "unknown"
 )
 
@@ -46,9 +47,20 @@ type AnalyzeRequest struct {
 
 // AnalyzeResponse is the JSON body returned by POST /api/v1/analyze.
 type AnalyzeResponse struct {
-	Type    CertType      `json:"type"`
-	Entries []interface{} `json:"entries"`
-	Issues  []Issue       `json:"issues"`
+	// SessionID is a server-generated UUID assigned to this entry in the
+	// in-memory session store. The frontend uses it to restore state on reload
+	// and to delete individual entries.
+	SessionID string        `json:"sessionId,omitempty"`
+	Type      CertType      `json:"type"`
+	Entries   []interface{} `json:"entries"`
+	Issues    []Issue       `json:"issues"`
+}
+
+// SessionFile is the metadata returned by GET /api/v1/session/files.
+type SessionFile struct {
+	ID       string           `json:"id"`
+	Filename string           `json:"filename"`
+	Result   *AnalyzeResponse `json:"result"`
 }
 
 // VerifyChainRequest is the JSON body accepted by POST /api/v1/verify-chain.
@@ -195,6 +207,16 @@ type PrivateKeyInfo struct {
 	BitSize   int     `json:"bitSize,omitempty"`
 	Curve     string  `json:"curve,omitempty"`
 	Issues    []Issue `json:"issues,omitempty"`
+}
+
+// SRLInfo holds the serial number extracted from an OpenSSL .srl file.
+// These files track the next serial number a CA will assign to a certificate.
+type SRLInfo struct {
+	// SerialHex is the raw hex string read from the file.
+	SerialHex string `json:"serialHex"`
+	// SerialDecimal is the same value formatted as a decimal integer string.
+	SerialDecimal string  `json:"serialDecimal"`
+	Issues        []Issue `json:"issues,omitempty"`
 }
 
 // JWKInfo holds information extracted from a JSON Web Key or JWKS.

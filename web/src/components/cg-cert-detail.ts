@@ -1,5 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { FileEntry } from "../cg-app.js";
 import type {
   AnalyzeResponse,
   X509Info,
@@ -8,6 +9,7 @@ import type {
   PKCS7Info,
   PrivateKeyInfo,
   JWKInfo,
+  SRLInfo,
   Issue,
   VerifyChainResponse,
 } from "../api.js";
@@ -31,6 +33,8 @@ export class CgCertDetail extends LitElement {
   @property({ type: String }) filename = "";
   @property({ type: Object }) file: File | undefined = undefined;
   @property({ type: Array }) otherFiles: File[] = [];
+  @property({ type: Array }) allFiles: FileEntry[] = [];
+  @property({ type: String }) entryId = "";
   @property({ type: Object }) verifyResult: VerifyChainResponse | undefined =
     undefined;
   @state() private _tab: "detail" | "raw" = "detail";
@@ -178,6 +182,8 @@ export class CgCertDetail extends LitElement {
         return this._renderPrivateKey(entry as PrivateKeyInfo, label);
       case "jwk":
         return this._renderJWK(entry as JWKInfo, label);
+      case "srl":
+        return this._renderSRL(entry as SRLInfo);
       default:
         return html`<pre class="text-xs overflow-auto">
 ${JSON.stringify(entry, null, 2)}</pre
@@ -326,33 +332,139 @@ ${JSON.stringify(entry, null, 2)}</pre
                 `,
               )
             : ""}
-          ${info.revocation
-            ? this._section(
-                "Revocation",
-                html`
-                  <div class="text-xs space-y-1">
-                    ${info.revocation.ocspServers?.map(
-                      (s) =>
-                        html`<div>
-                          <span class="text-base-content/50">OCSP </span>${s}
-                        </div>`,
-                    ) ?? ""}
-                    ${info.revocation.crlDistributionPoints?.map(
-                      (s) =>
-                        html`<div>
-                          <span class="text-base-content/50">CRL DP </span>${s}
-                        </div>`,
-                    ) ?? ""}
-                  </div>
-                `,
-              )
-            : ""}
+          ${this._section(
+            "Revocation",
+            html`
+              <div class="text-xs space-y-1">
+                ${(info.revocation?.ocspServers?.length ?? 0) === 0 &&
+                (info.revocation?.crlDistributionPoints?.length ?? 0) === 0
+                  ? html`<span class="text-base-content/30 italic">—</span>`
+                  : html`
+                      ${info.revocation?.ocspServers?.map(
+                        (s) =>
+                          html`<div>
+                            <span class="text-base-content/50">OCSP </span>${s}
+                          </div>`,
+                      ) ?? ""}
+                      ${info.revocation?.crlDistributionPoints?.map(
+                        (s) =>
+                          html`<div>
+                            <span class="text-base-content/50">CRL DP </span
+                            >${s}
+                          </div>`,
+                      ) ?? ""}
+                    `}
+              </div>
+            `,
+          )}
           ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)
             : ""}
+          ${this._renderX509RelationshipSections(info)}
         </div>
       </div>
     `;
+  }
+
+  /** Computes and renders inline CA/signed-certs relationship sections. */
+  private _renderX509RelationshipSections(info: X509Info) {
+    if (!this.allFiles.length || !this.entryId) return html``;
+
+    // Collect all X.509 entries from loaded files.
+    const allCerts: { fileId: string; filename: string; info: X509Info }[] = [];
+    for (const f of this.allFiles) {
+      if (f.status !== "done" || !f.result) continue;
+      const { type, entries } = f.result;
+      if (type === "x509" || type === "bundle" || type === "pkcs7") {
+        for (const e of entries) {
+          allCerts.push({
+            fileId: f.id,
+            filename: f.file.name,
+            info: e as X509Info,
+          });
+        }
+      }
+    }
+
+    const navigate = (id: string) => () =>
+      this.dispatchEvent(
+        new CustomEvent("navigate-to-file", {
+          detail: id,
+          bubbles: true,
+          composed: true,
+        }),
+      );
+
+    const sections: unknown[] = [];
+
+    // For non-self-signed certs: find the CA that signed them.
+    if (!info.isSelfSigned) {
+      const issuerCN = info.issuer?.commonName ?? "";
+      const issuerOrg = (info.issuer?.organization ?? []).join(",");
+      const ca = allCerts.find(
+        (c) =>
+          c.fileId !== this.entryId &&
+          c.info.basicConstraints?.isCA &&
+          c.info.subject?.commonName === issuerCN &&
+          (c.info.subject?.organization ?? []).join(",") === issuerOrg,
+      );
+      if (ca) {
+        sections.push(
+          this._section(
+            "Signed by (CA)",
+            html`<div class="flex items-center gap-2">
+              <span class="text-sm"
+                >${ca.info.subject.commonName || ca.filename}</span
+              >
+              <button
+                class="btn btn-xs btn-outline"
+                @click=${navigate(ca.fileId)}
+              >
+                View CA
+              </button>
+            </div>`,
+          ),
+        );
+      }
+    }
+
+    // For CA certs: find all certificates they signed.
+    if (info.basicConstraints?.isCA) {
+      const subjectCN = info.subject?.commonName ?? "";
+      const subjectOrg = (info.subject?.organization ?? []).join(",");
+      const signed = allCerts.filter(
+        (c) =>
+          c.fileId !== this.entryId &&
+          !c.info.isSelfSigned &&
+          c.info.issuer?.commonName === subjectCN &&
+          (c.info.issuer?.organization ?? []).join(",") === subjectOrg,
+      );
+      if (signed.length > 0) {
+        sections.push(
+          this._section(
+            `Signed certificates (${signed.length})`,
+            html`<ul class="space-y-1">
+              ${signed.map(
+                (c) =>
+                  html`<li class="flex items-center gap-2">
+                    <span class="text-sm truncate max-w-xs"
+                      >${c.info.subject?.commonName || c.filename}</span
+                    >
+                    <button
+                      class="btn btn-xs btn-outline ml-auto"
+                      @click=${navigate(c.fileId)}
+                    >
+                      View
+                    </button>
+                  </li>`,
+              )}
+            </ul>`,
+          ),
+        );
+      }
+    }
+
+    return sections;
   }
 
   // ── CSR ───────────────────────────────────────────────────────────────────
@@ -532,6 +644,35 @@ ${JSON.stringify(entry, null, 2)}</pre
                 ${info.algorithm === "Encrypted" ? "Yes" : "No"}
               </span>
             `,
+          )}
+          ${(info.issues ?? []).length > 0
+            ? this._renderIssues("Issues", info.issues)
+            : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── SRL ───────────────────────────────────────────────────────────────────
+
+  private _renderSRL(info: SRLInfo) {
+    return html`
+      <div class="card bg-base-100 border border-base-300">
+        <div class="card-body p-4 space-y-3">
+          <p class="text-xs text-base-content/50 uppercase tracking-wider">
+            OpenSSL CA Serial Number File
+          </p>
+          ${this._section(
+            "Next Serial (hex)",
+            html`<span class="font-mono text-sm">${info.serialHex}</span>
+              <cg-copy-button
+                .value=${info.serialHex}
+                class="ml-2"
+              ></cg-copy-button>`,
+          )}
+          ${this._section(
+            "Next Serial (decimal)",
+            html`<span class="font-mono text-sm">${info.serialDecimal}</span>`,
           )}
           ${(info.issues ?? []).length > 0
             ? this._renderIssues("Issues", info.issues)

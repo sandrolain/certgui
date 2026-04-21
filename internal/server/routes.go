@@ -14,6 +14,8 @@ func (s *Server) buildMux() http.Handler {
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
 	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
 	mux.HandleFunc("GET /api/v1/events", s.handleEvents)
+	mux.HandleFunc("GET /api/v1/session/files", s.handleListSessionFiles)
+	mux.HandleFunc("DELETE /api/v1/session/files/{id}", s.handleDeleteSessionFile)
 
 	// Serve the embedded SPA for all non-API routes.
 	// The SPA itself handles client-side routing.

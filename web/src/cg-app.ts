@@ -1,12 +1,18 @@
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { AnalyzeResponse, VerifyChainResponse } from "./api.js";
-import { analyzeFile, PasswordRequiredError, verifyChain } from "./api.js";
+import {
+  analyzeFile,
+  deleteSessionFile,
+  listSessionFiles,
+  PasswordRequiredError,
+  verifyChain,
+} from "./api.js";
 import "./components/cg-header.js";
 import "./components/cg-file-list.js";
 import "./components/cg-detail-panel.js";
-import "./components/cg-password-dialog.js";
 import "./components/cg-diff-view.js";
+import "./components/cg-relationships.js";
 
 export interface FileEntry {
   id: string;
@@ -15,6 +21,8 @@ export interface FileEntry {
   result?: AnalyzeResponse;
   error?: string;
   password?: string;
+  needsPassword?: boolean;
+  sessionId?: string;
   verifyResult?: VerifyChainResponse | null;
 }
 
@@ -26,7 +34,6 @@ export class CgApp extends LitElement {
 
   @state() private files: FileEntry[] = [];
   @state() private selectedId: string | null = null;
-  @state() private passwordPromptId: string | null = null;
   @state() private _isDragging = false;
   private _dragCounter = 0;
 
@@ -40,6 +47,7 @@ export class CgApp extends LitElement {
     document.addEventListener("dragleave", this._onGlobalDragLeave);
     document.addEventListener("dragover", this._onGlobalDragOver);
     document.addEventListener("drop", this._onGlobalDrop);
+    this._restoreSession();
   }
 
   override disconnectedCallback() {
@@ -91,7 +99,10 @@ export class CgApp extends LitElement {
     return html`
       <cg-header @files-dropped=${this._onFilesDropped}></cg-header>
 
-      <div class="flex flex-1 overflow-hidden">
+      <div
+        class="flex flex-1 overflow-hidden"
+        @navigate-to-file=${this._onNavigateToFile}
+      >
         <cg-file-list
           .files=${this.files}
           .selectedId=${this.selectedId}
@@ -102,20 +113,23 @@ export class CgApp extends LitElement {
 
         <cg-detail-panel
           .entry=${this.selected}
+          .allFiles=${this.files}
           .otherFiles=${otherFiles}
           @verify-chain=${this._onVerifyChain}
+          @password-submit=${this._onPasswordSubmit}
+          @password-cancel=${this._onPasswordCancel}
           class="flex-1 overflow-y-auto"
         ></cg-detail-panel>
+
+        ${this.files.filter((f) => f.status === "done").length > 1
+          ? html`<cg-relationships
+              .files=${this.files}
+              .selectedId=${this.selectedId}
+              class="w-64 shrink-0 border-l border-base-300 overflow-y-auto"
+            ></cg-relationships>`
+          : ""}
       </div>
 
-      ${this.passwordPromptId
-        ? html`
-            <cg-password-dialog
-              @password-submit=${this._onPasswordSubmit}
-              @password-cancel=${this._onPasswordCancel}
-            ></cg-password-dialog>
-          `
-        : ""}
       ${this._isDragging
         ? html`
             <div
@@ -159,7 +173,15 @@ export class CgApp extends LitElement {
     this.selectedId = e.detail;
   }
 
+  private _onNavigateToFile(e: CustomEvent<string>) {
+    this.selectedId = e.detail;
+  }
+
   private _onFileRemoved(e: CustomEvent<string>) {
+    const entry = this.files.find((f) => f.id === e.detail);
+    if (entry?.sessionId) {
+      deleteSessionFile(entry.sessionId).catch(() => {});
+    }
     this.files = this.files.filter((f) => f.id !== e.detail);
     if (this.selectedId === e.detail) {
       this.selectedId = this.files[0]?.id ?? null;
@@ -167,23 +189,20 @@ export class CgApp extends LitElement {
   }
 
   private _onPasswordSubmit(e: CustomEvent<string>) {
-    const id = this.passwordPromptId;
-    this.passwordPromptId = null;
-    if (id) {
-      this._updateEntry(id, { password: e.detail });
-      this._analyze(id, e.detail);
-    }
+    const id = this.selected?.id;
+    if (!id) return;
+    this._updateEntry(id, { needsPassword: false, password: e.detail });
+    this._analyze(id, e.detail);
   }
 
   private _onPasswordCancel() {
-    const id = this.passwordPromptId;
-    this.passwordPromptId = null;
-    if (id) {
-      this._updateEntry(id, {
-        status: "error",
-        error: "Password required but not provided.",
-      });
-    }
+    const id = this.selected?.id;
+    if (!id) return;
+    this._updateEntry(id, {
+      needsPassword: false,
+      status: "error",
+      error: "Password required but not provided.",
+    });
   }
 
   private async _analyze(id: string, password?: string) {
@@ -194,15 +213,18 @@ export class CgApp extends LitElement {
 
     try {
       const result = await analyzeFile(entry.file, password);
-      this._updateEntry(id, { status: "done", result });
+      this._updateEntry(id, {
+        status: "done",
+        result,
+        sessionId: result.sessionId,
+      });
       if (this.selectedId === null) {
         this.selectedId = id;
       }
     } catch (err) {
       // Explicit 422 password-required signal from the backend.
       if (err instanceof PasswordRequiredError) {
-        this.passwordPromptId = id;
-        this._updateEntry(id, { status: "pending" });
+        this._updateEntry(id, { status: "pending", needsPassword: true });
         return;
       }
       const msg = err instanceof Error ? err.message : String(err);
@@ -211,8 +233,7 @@ export class CgApp extends LitElement {
         msg.toLowerCase().includes("decryption") ||
         msg.toLowerCase().includes("password")
       ) {
-        this.passwordPromptId = id;
-        this._updateEntry(id, { status: "pending" });
+        this._updateEntry(id, { status: "pending", needsPassword: true });
       } else {
         this._updateEntry(id, { status: "error", error: msg });
       }
@@ -221,6 +242,27 @@ export class CgApp extends LitElement {
 
   private _updateEntry(id: string, patch: Partial<FileEntry>) {
     this.files = this.files.map((f) => (f.id === id ? { ...f, ...patch } : f));
+  }
+
+  private async _restoreSession() {
+    try {
+      const sessionFiles = await listSessionFiles();
+      if (sessionFiles.length === 0) return;
+      const restored: FileEntry[] = sessionFiles.map((sf) => ({
+        id: crypto.randomUUID(),
+        // Reconstruct a minimal File object from the session metadata.
+        file: new File([], sf.filename),
+        status: "done" as const,
+        result: sf.result,
+        sessionId: sf.id,
+      }));
+      this.files = [...restored, ...this.files];
+      if (this.selectedId === null && restored.length > 0) {
+        this.selectedId = restored[0].id;
+      }
+    } catch {
+      // Session restore is best-effort; ignore failures.
+    }
   }
 
   private async _onVerifyChain() {

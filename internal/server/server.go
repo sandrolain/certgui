@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/sandrolain/certgui/internal/model"
 )
 
 // Config holds the configuration for the HTTP server.
@@ -16,18 +19,84 @@ type Config struct {
 	Dev      bool
 }
 
+// sessionEntry is an in-memory record of an analysed file stored for the
+// lifetime of the server process.
+type sessionEntry struct {
+	id       string
+	filename string
+	result   *model.AnalyzeResponse
+}
+
 // Server wraps an http.Server with certgui-specific configuration.
 type Server struct {
 	cfg     Config
 	httpSrv *http.Server
 	handler http.Handler
+
+	sessionMu      sync.RWMutex
+	sessionEntries []*sessionEntry // ordered list of analysed files
+	sessionIndex   map[string]*sessionEntry
 }
 
 // New creates a new Server with the given configuration.
 func New(cfg Config) *Server {
-	s := &Server{cfg: cfg}
+	s := &Server{
+		cfg:          cfg,
+		sessionIndex: make(map[string]*sessionEntry),
+	}
 	s.handler = s.buildMux()
 	return s
+}
+
+// storeSession saves an analysed file into the in-memory session store.
+// Returns the server-generated ID assigned to this entry.
+// If an entry with the same id already exists it is replaced.
+func (s *Server) storeSession(id, filename string, result *model.AnalyzeResponse) {
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	e := &sessionEntry{id: id, filename: filename, result: result}
+	if _, exists := s.sessionIndex[id]; !exists {
+		s.sessionEntries = append(s.sessionEntries, e)
+	} else {
+		for i, se := range s.sessionEntries {
+			if se.id == id {
+				s.sessionEntries[i] = e
+				break
+			}
+		}
+	}
+	s.sessionIndex[id] = e
+}
+
+// deleteSession removes an entry from the session store.
+func (s *Server) deleteSession(id string) {
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	if _, ok := s.sessionIndex[id]; !ok {
+		return
+	}
+	delete(s.sessionIndex, id)
+	for i, se := range s.sessionEntries {
+		if se.id == id {
+			s.sessionEntries = append(s.sessionEntries[:i], s.sessionEntries[i+1:]...)
+			break
+		}
+	}
+}
+
+// listSession returns all stored session entries as SessionFile values.
+func (s *Server) listSession() []model.SessionFile {
+	s.sessionMu.RLock()
+	defer s.sessionMu.RUnlock()
+	out := make([]model.SessionFile, len(s.sessionEntries))
+	for i, se := range s.sessionEntries {
+		out[i] = model.SessionFile{
+			ID:       se.id,
+			Filename: se.filename,
+			Result:   se.result,
+		}
+	}
+	return out
 }
 
 // ServeHTTP implements http.Handler so Server can be used directly in tests.
