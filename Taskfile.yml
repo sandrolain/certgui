@@ -80,6 +80,13 @@ tasks:
 
   # ── Release ─────────────────────────────────────────────────────────────────
 
+  release:dry:
+    desc: Dry-run GoReleaser locally (builds all targets, skips publishing)
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  # ── Release ─────────────────────────────────────────────────────────────────
+
   release:
     desc: Cross-compile for all supported platforms (output → dist/)
     deps: [ build:frontend ]
