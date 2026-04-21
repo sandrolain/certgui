@@ -126,3 +126,9 @@ func isBinaryPKCS12(data []byte) bool {
 	// PFX starts with SEQUENCE containing an INTEGER (version 3)
 	return len(data) > 6 && data[0] == 0x30 && data[4] == 0x02
 }
+
+// IsBinaryPKCS12 is the exported version of the PKCS#12 binary check.
+// It is used by the HTTP handler to decide whether to prompt for a password.
+func IsBinaryPKCS12(data []byte) bool {
+	return isBinaryPKCS12(data)
+}

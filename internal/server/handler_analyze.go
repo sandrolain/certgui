@@ -33,6 +33,15 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	certType := analyzer.Detect(raw)
+
+	// For PKCS#12 binary files a password is always required.
+	// When none is provided, return a dedicated error so the frontend can
+	// prompt the user for the passphrase before retrying.
+	if certType == model.TypePKCS7 && analyzer.IsBinaryPKCS12(raw) && req.Password == "" {
+		writeError(w, http.StatusUnprocessableEntity, "password required for PKCS#12 file")
+		return
+	}
+
 	resp, err := s.dispatch(certType, raw, req.Password, req.Filename)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "analysis failed: "+err.Error())

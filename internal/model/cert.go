@@ -39,7 +39,7 @@ type Issue struct {
 type AnalyzeRequest struct {
 	Filename string `json:"filename"`
 	// Content is the base64-encoded raw bytes of the file.
-	Content  string `json:"content"`
+	Content string `json:"content"`
 	// Password is only required for PKCS#12 files protected by a passphrase.
 	Password string `json:"password,omitempty"`
 }
@@ -49,6 +49,29 @@ type AnalyzeResponse struct {
 	Type    CertType      `json:"type"`
 	Entries []interface{} `json:"entries"`
 	Issues  []Issue       `json:"issues"`
+}
+
+// VerifyChainRequest is the JSON body accepted by POST /api/v1/verify-chain.
+type VerifyChainRequest struct {
+	// LeafContent is the base64-encoded bytes of the leaf certificate to verify.
+	LeafContent string `json:"leafContent"`
+	// ChainContent is a list of base64-encoded certificate files (PEM or DER)
+	// to use as the trust pool when building the chain.
+	ChainContent []string `json:"chainContent"`
+}
+
+// VerifyChainEntry represents a single certificate in the verified chain path.
+type VerifyChainEntry struct {
+	CommonName   string `json:"commonName"`
+	Organization string `json:"organization,omitempty"`
+	IsSelfSigned bool   `json:"isSelfSigned"`
+}
+
+// VerifyChainResponse is the JSON body returned by POST /api/v1/verify-chain.
+type VerifyChainResponse struct {
+	Valid bool               `json:"valid"`
+	Chain []VerifyChainEntry `json:"chain,omitempty"`
+	Error string             `json:"error,omitempty"`
 }
 
 // NameInfo holds the distinguished name fields of a certificate subject or issuer.
@@ -67,9 +90,9 @@ type NameInfo struct {
 
 // PublicKeyInfo describes the public key embedded in a certificate or CSR.
 type PublicKeyInfo struct {
-	Algorithm  string `json:"algorithm"`
-	BitSize    int    `json:"bitSize,omitempty"`
-	Curve      string `json:"curve,omitempty"`
+	Algorithm   string `json:"algorithm"`
+	BitSize     int    `json:"bitSize,omitempty"`
+	Curve       string `json:"curve,omitempty"`
 	Fingerprint string `json:"fingerprint"`
 }
 
@@ -95,9 +118,9 @@ type SANInfo struct {
 
 // BasicConstraintsInfo holds the Basic Constraints extension fields.
 type BasicConstraintsInfo struct {
-	IsCA                bool `json:"isCA"`
-	PathLenConstraint   int  `json:"pathLenConstraint"`
-	PathLenPresent      bool `json:"pathLenPresent"`
+	IsCA              bool `json:"isCA"`
+	PathLenConstraint int  `json:"pathLenConstraint"`
+	PathLenPresent    bool `json:"pathLenPresent"`
 }
 
 // ExtensionInfo represents a decoded X.509 certificate extension.
@@ -151,13 +174,13 @@ type CSRInfo struct {
 
 // CRLInfo holds all extracted information from a Certificate Revocation List.
 type CRLInfo struct {
-	Issuer      NameInfo  `json:"issuer"`
-	ThisUpdate  time.Time `json:"thisUpdate"`
-	NextUpdate  time.Time `json:"nextUpdate"`
-	RevokedCount int      `json:"revokedCount"`
-	Signature   SignatureInfo `json:"signature"`
-	PEM         string    `json:"pem"`
-	Issues      []Issue   `json:"issues,omitempty"`
+	Issuer       NameInfo      `json:"issuer"`
+	ThisUpdate   time.Time     `json:"thisUpdate"`
+	NextUpdate   time.Time     `json:"nextUpdate"`
+	RevokedCount int           `json:"revokedCount"`
+	Signature    SignatureInfo `json:"signature"`
+	PEM          string        `json:"pem"`
+	Issues       []Issue       `json:"issues,omitempty"`
 }
 
 // PKCS7Info holds certificate entries extracted from a PKCS#7 / CMS structure.
@@ -168,20 +191,20 @@ type PKCS7Info struct {
 
 // PrivateKeyInfo holds metadata extracted from a private key (no key material is returned).
 type PrivateKeyInfo struct {
-	Algorithm string `json:"algorithm"`
-	BitSize   int    `json:"bitSize,omitempty"`
-	Curve     string `json:"curve,omitempty"`
+	Algorithm string  `json:"algorithm"`
+	BitSize   int     `json:"bitSize,omitempty"`
+	Curve     string  `json:"curve,omitempty"`
 	Issues    []Issue `json:"issues,omitempty"`
 }
 
 // JWKInfo holds information extracted from a JSON Web Key or JWKS.
 type JWKInfo struct {
-	KeyType   string  `json:"kty"`
-	Use       string  `json:"use,omitempty"`
-	Algorithm string  `json:"alg,omitempty"`
-	KeyID     string  `json:"kid,omitempty"`
-	BitSize   int     `json:"bitSize,omitempty"`
-	Curve     string  `json:"curve,omitempty"`
+	KeyType   string    `json:"kty"`
+	Use       string    `json:"use,omitempty"`
+	Algorithm string    `json:"alg,omitempty"`
+	KeyID     string    `json:"kid,omitempty"`
+	BitSize   int       `json:"bitSize,omitempty"`
+	Curve     string    `json:"curve,omitempty"`
 	Keys      []JWKInfo `json:"keys,omitempty"`
-	Issues    []Issue `json:"issues,omitempty"`
+	Issues    []Issue   `json:"issues,omitempty"`
 }

@@ -10,6 +10,7 @@ func (s *Server) buildMux() http.Handler {
 
 	// API routes
 	mux.HandleFunc("POST /api/v1/analyze", s.handleAnalyze)
+	mux.HandleFunc("POST /api/v1/verify-chain", s.handleVerifyChain)
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
 	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
 	mux.HandleFunc("GET /api/v1/events", s.handleEvents)

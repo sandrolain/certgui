@@ -1,7 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import type { AnalyzeResponse } from "./api.js";
-import { analyzeFile } from "./api.js";
+import type { AnalyzeResponse, VerifyChainResponse } from "./api.js";
+import { analyzeFile, PasswordRequiredError, verifyChain } from "./api.js";
 import "./components/cg-header.js";
 import "./components/cg-file-list.js";
 import "./components/cg-detail-panel.js";
@@ -15,6 +15,7 @@ export interface FileEntry {
   result?: AnalyzeResponse;
   error?: string;
   password?: string;
+  verifyResult?: VerifyChainResponse | null;
 }
 
 @customElement("cg-app")
@@ -75,6 +76,18 @@ export class CgApp extends LitElement {
   };
 
   override render() {
+    const otherFiles = this.files
+      .filter(
+        (f) =>
+          f.id !== this.selectedId &&
+          f.status === "done" &&
+          f.result &&
+          (f.result.type === "x509" ||
+            f.result.type === "bundle" ||
+            f.result.type === "pkcs7"),
+      )
+      .map((f) => f.file);
+
     return html`
       <cg-header @files-dropped=${this._onFilesDropped}></cg-header>
 
@@ -89,6 +102,8 @@ export class CgApp extends LitElement {
 
         <cg-detail-panel
           .entry=${this.selected}
+          .otherFiles=${otherFiles}
+          @verify-chain=${this._onVerifyChain}
           class="flex-1 overflow-y-auto"
         ></cg-detail-panel>
       </div>
@@ -184,8 +199,14 @@ export class CgApp extends LitElement {
         this.selectedId = id;
       }
     } catch (err) {
+      // Explicit 422 password-required signal from the backend.
+      if (err instanceof PasswordRequiredError) {
+        this.passwordPromptId = id;
+        this._updateEntry(id, { status: "pending" });
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
-      // Heuristic: ask for password if the error suggests decryption failure.
+      // Fallback heuristic for older-style error messages.
       if (
         msg.toLowerCase().includes("decryption") ||
         msg.toLowerCase().includes("password")
@@ -200,6 +221,38 @@ export class CgApp extends LitElement {
 
   private _updateEntry(id: string, patch: Partial<FileEntry>) {
     this.files = this.files.map((f) => (f.id === id ? { ...f, ...patch } : f));
+  }
+
+  private async _onVerifyChain() {
+    const id = this.selectedId;
+    if (!id) return;
+    const entry = this.files.find((f) => f.id === id);
+    if (!entry || entry.status !== "done") return;
+
+    // Clear previous result while verifying.
+    this._updateEntry(id, { verifyResult: null });
+
+    const otherFiles = this.files
+      .filter(
+        (f) =>
+          f.id !== id &&
+          f.status === "done" &&
+          f.result &&
+          (f.result.type === "x509" ||
+            f.result.type === "bundle" ||
+            f.result.type === "pkcs7"),
+      )
+      .map((f) => f.file);
+
+    try {
+      const result = await verifyChain(entry.file, otherFiles);
+      this._updateEntry(id, { verifyResult: result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this._updateEntry(id, {
+        verifyResult: { valid: false, error: msg },
+      });
+    }
   }
 }
 

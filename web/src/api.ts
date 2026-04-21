@@ -150,7 +150,26 @@ export interface AnalyzeRequest {
   password?: string;
 }
 
+export interface VerifyChainEntry {
+  commonName: string;
+  organization?: string;
+  isSelfSigned: boolean;
+}
+
+export interface VerifyChainResponse {
+  valid: boolean;
+  chain?: VerifyChainEntry[];
+  error?: string;
+}
+
 // ── HTTP client ──────────────────────────────────────────────────────────────
+
+/** Thrown when the server indicates a password is required (HTTP 422). */
+export class PasswordRequiredError extends Error {
+  constructor() {
+    super("password required");
+  }
+}
 
 export async function analyzeFile(
   file: File,
@@ -172,10 +191,41 @@ export async function analyzeFile(
     body: JSON.stringify(body),
   });
 
+  if (resp.status === 422) {
+    throw new PasswordRequiredError();
+  }
+
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`API error ${resp.status}: ${text}`);
   }
 
   return resp.json() as Promise<AnalyzeResponse>;
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const ab = await file.arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(ab)));
+}
+
+/** Verify that leafFile can be validated by the certificates in chainFiles. */
+export async function verifyChain(
+  leaf: File,
+  chainFiles: File[],
+): Promise<VerifyChainResponse> {
+  const leafContent = await fileToBase64(leaf);
+  const chainContent = await Promise.all(chainFiles.map(fileToBase64));
+
+  const resp = await fetch("/api/v1/verify-chain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leafContent, chainContent }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`API error ${resp.status}: ${text}`);
+  }
+
+  return resp.json() as Promise<VerifyChainResponse>;
 }

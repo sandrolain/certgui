@@ -13,6 +13,7 @@ export class CgDetailPanel extends LitElement {
   }
 
   @property({ type: Object }) entry: FileEntry | undefined = undefined;
+  @property({ type: Array }) otherFiles: File[] = [];
 
   override render() {
     if (!this.entry) {
@@ -67,6 +68,8 @@ export class CgDetailPanel extends LitElement {
           .response=${result}
           .filename=${this.entry.file.name}
           .file=${this.entry.file}
+          .otherFiles=${this.otherFiles}
+          .verifyResult=${this.entry.verifyResult ?? undefined}
         ></cg-cert-detail>
       </div>
     `;

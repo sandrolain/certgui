@@ -189,3 +189,134 @@ func TestParsePKCS12_WrongPassword(t *testing.T) {
 		t.Error("expected error with wrong password")
 	}
 }
+
+// ── New fixture tests ─────────────────────────────────────────────────────────
+
+func TestParseX509PEM_ServerSAN(t *testing.T) {
+	data := readTestdata(t, "server.crt.pem")
+	infos, err := analyzer.ParseX509PEM(data, 30)
+	if err != nil {
+		t.Fatalf("ParseX509PEM server: %v", err)
+	}
+	if len(infos) == 0 {
+		t.Fatal("expected at least 1 cert")
+	}
+	cert := infos[0]
+	if len(cert.SANs.DNSNames) == 0 {
+		t.Error("expected DNS SANs in server.crt.pem")
+	}
+	if len(cert.SANs.IPAddresses) == 0 {
+		t.Error("expected IP SAN in server.crt.pem")
+	}
+	hasServerAuth := false
+	for _, eku := range cert.ExtKeyUsage {
+		if eku == "ServerAuth" {
+			hasServerAuth = true
+			break
+		}
+	}
+	if !hasServerAuth {
+		t.Errorf("expected serverAuth EKU, got %v", cert.ExtKeyUsage)
+	}
+}
+
+func TestParseX509PEM_ClientCert(t *testing.T) {
+	data := readTestdata(t, "client.crt.pem")
+	infos, err := analyzer.ParseX509PEM(data, 30)
+	if err != nil {
+		t.Fatalf("ParseX509PEM client: %v", err)
+	}
+	if len(infos) == 0 {
+		t.Fatal("expected at least 1 cert")
+	}
+	cert := infos[0]
+	hasClientAuth := false
+	for _, eku := range cert.ExtKeyUsage {
+		if eku == "ClientAuth" {
+			hasClientAuth = true
+			break
+		}
+	}
+	if !hasClientAuth {
+		t.Errorf("expected clientAuth EKU, got %v", cert.ExtKeyUsage)
+	}
+	if len(cert.SANs.EmailAddresses) == 0 {
+		t.Error("expected email SAN in client.crt.pem")
+	}
+}
+
+func TestParseX509PEM_Expired(t *testing.T) {
+	data := readTestdata(t, "expired.crt.pem")
+	infos, err := analyzer.ParseX509PEM(data, 30)
+	if err != nil {
+		t.Fatalf("ParseX509PEM expired: %v", err)
+	}
+	if len(infos) == 0 {
+		t.Fatal("expected at least 1 cert")
+	}
+	hasExpiredIssue := false
+	for _, issue := range infos[0].Issues {
+		if issue.Code == "CERT_EXPIRED" {
+			hasExpiredIssue = true
+			break
+		}
+	}
+	if !hasExpiredIssue {
+		t.Error("expected CERT_EXPIRED issue for expired.crt.pem")
+	}
+}
+
+func TestParseX509PEM_Fullchain(t *testing.T) {
+	data := readTestdata(t, "fullchain.pem")
+	infos, err := analyzer.ParseX509PEM(data, 30)
+	if err != nil {
+		t.Fatalf("ParseX509PEM fullchain: %v", err)
+	}
+	if len(infos) < 3 {
+		t.Errorf("expected 3 certs in fullchain.pem, got %d", len(infos))
+	}
+}
+
+func TestParsePrivateKey_Encrypted(t *testing.T) {
+	data := readTestdata(t, "rsa.key.enc.pem")
+	info, err := analyzer.ParsePrivateKey(data)
+	if err != nil {
+		t.Fatalf("ParsePrivateKey encrypted: %v", err)
+	}
+	if info.Algorithm != "Encrypted" {
+		t.Errorf("algorithm = %q, want Encrypted", info.Algorithm)
+	}
+}
+
+func TestParseCSR_EC(t *testing.T) {
+	data := readTestdata(t, "ec.csr.pem")
+	info, err := analyzer.ParseCSR(data)
+	if err != nil {
+		t.Fatalf("ParseCSR EC: %v", err)
+	}
+	if info.Subject.CommonName != "ec-csr.example.com" {
+		t.Errorf("CN = %q, want ec-csr.example.com", info.Subject.CommonName)
+	}
+}
+
+func TestParsePKCS12_NoPassword(t *testing.T) {
+	data := readTestdata(t, "test-nopass.p12")
+	info, err := analyzer.ParsePKCS12(data, "", 30)
+	if err != nil {
+		t.Fatalf("ParsePKCS12 no-pass: %v", err)
+	}
+	if len(info.Certificates) == 0 {
+		t.Error("expected at least one certificate in test-nopass.p12")
+	}
+}
+
+func TestIsBinaryPKCS12(t *testing.T) {
+	data := readTestdata(t, "test.p12")
+	if !analyzer.IsBinaryPKCS12(data) {
+		t.Error("IsBinaryPKCS12(test.p12) = false, want true")
+	}
+	pem := readTestdata(t, "rsa.crt.pem")
+	if analyzer.IsBinaryPKCS12(pem) {
+		t.Error("IsBinaryPKCS12(rsa.crt.pem) = true, want false")
+	}
+}

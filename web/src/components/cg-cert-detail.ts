@@ -9,6 +9,7 @@ import type {
   PrivateKeyInfo,
   JWKInfo,
   Issue,
+  VerifyChainResponse,
 } from "../api.js";
 import "./cg-issue-badge.js";
 import "./cg-copy-button.js";
@@ -29,6 +30,9 @@ export class CgCertDetail extends LitElement {
   @property({ type: Object }) response: AnalyzeResponse | undefined = undefined;
   @property({ type: String }) filename = "";
   @property({ type: Object }) file: File | undefined = undefined;
+  @property({ type: Array }) otherFiles: File[] = [];
+  @property({ type: Object }) verifyResult: VerifyChainResponse | undefined =
+    undefined;
   @state() private _tab: "detail" | "raw" = "detail";
 
   override render() {
@@ -41,12 +45,27 @@ export class CgCertDetail extends LitElement {
           <h2 class="text-lg font-semibold truncate">${this.filename}</h2>
           <span class="badge badge-outline">${type}</span>
           <div class="ml-auto flex gap-2">
+            ${(type === "x509" || type === "bundle") &&
+            this.otherFiles.length > 0
+              ? html`
+                  <button
+                    class="btn btn-sm btn-outline"
+                    @click=${this._onVerifyChain}
+                    title="Verify against ${this.otherFiles
+                      .length} other loaded file(s)"
+                  >
+                    Verify chain
+                  </button>
+                `
+              : ""}
             <cg-export-menu
               .response=${this.response}
               .filename=${this.filename.replace(/\.[^.]+$/, "")}
             ></cg-export-menu>
           </div>
         </div>
+
+        ${this._renderVerifyResult()}
 
         <div class="tabs tabs-border">
           <button
@@ -77,6 +96,62 @@ export class CgCertDetail extends LitElement {
                 this._renderEntry(type, entry, i, entries.length),
               )}
             `}
+      </div>
+    `;
+  }
+
+  private _onVerifyChain() {
+    this.dispatchEvent(
+      new CustomEvent("verify-chain", { bubbles: true, composed: true }),
+    );
+  }
+
+  private _renderVerifyResult() {
+    const r = this.verifyResult;
+    if (r === undefined) return "";
+    // null means in-progress
+    if (r === null) {
+      return html`
+        <div class="alert alert-info py-2 px-3 text-sm flex gap-2 items-center">
+          <span class="loading loading-spinner loading-xs"></span>
+          Verifying chain…
+        </div>
+      `;
+    }
+    if (!r.valid) {
+      return html`
+        <div class="alert alert-error py-2 px-3 text-sm">
+          <span class="font-semibold">Chain invalid:</span>
+          ${r.error ?? "Verification failed"}
+        </div>
+      `;
+    }
+    return html`
+      <div class="alert alert-success py-2 px-3 text-sm space-y-1">
+        <p class="font-semibold">Chain valid</p>
+        ${r.chain && r.chain.length > 0
+          ? html`
+              <ol class="list-decimal list-inside text-xs space-y-0.5 ml-2">
+                ${r.chain.map(
+                  (entry) => html`
+                    <li>
+                      <span class="font-mono">${entry.commonName || "?"}</span>
+                      ${entry.organization
+                        ? html`<span class="text-base-content/60">
+                            (${entry.organization})</span
+                          >`
+                        : ""}
+                      ${entry.isSelfSigned
+                        ? html`<span class="badge badge-xs badge-outline ml-1"
+                            >root</span
+                          >`
+                        : ""}
+                    </li>
+                  `,
+                )}
+              </ol>
+            `
+          : ""}
       </div>
     `;
   }
