@@ -7,8 +7,8 @@ before:
     # Build the frontend assets before compiling Go binaries.
     # The Go embed directive (internal/server/assets.go) requires the dist/
     # directory to be populated before `go build` is invoked.
-    - cd web && bun install --frozen-lockfile
-    - cd web && bun run build
+    - sh -c "cd web && bun install --frozen-lockfile"
+    - sh -c "cd web && bun run build"
 
 builds:
   - id: certgui
